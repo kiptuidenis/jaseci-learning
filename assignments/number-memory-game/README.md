@@ -40,7 +40,7 @@ pip install -r requirements.txt
 
 ## Running the Game
 
-1. Save the game code into a file, e.g. `memory_game.jac`.
+1. Save the game code into a file, e.g. `number_memory_game.jac`.
 2. Run it using the Jac CLI:
 You need a valid gemini api key..its free!!
 
