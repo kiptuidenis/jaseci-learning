@@ -46,7 +46,7 @@ You need a valid gemini api key..its free!!
 
 ```bash
 export GEMINI_API_KEY="your-api-key-here"
-jac run memory_game.jac
+jac run number_memory_game.jac
 ```
 
 3. The game will:
@@ -91,7 +91,7 @@ Enter digits you saw (no spaces): 5
 Jac is **scale-agnostic**. By serving the game:
 
 ```bash
-jac serve memory_game.jac
+jac serve number_memory_game.jac
 ```
 
 you can expose the walker as an API endpoint, making the same code runnable in the cloud without changes.
