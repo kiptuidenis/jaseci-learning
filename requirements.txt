@@ -1,0 +1,22 @@
+# Core Jac
+jaclang
+jac-cloud
+jac-streamlit
+
+# LangChain + Vector DB
+langchain
+langchain-community
+langchain-openai
+langchain-chroma
+chromadb
+
+# LLM + Utilities
+openai
+byllm
+tiktoken
+pypdf
+requests
+
+# MCP (Model Context Protocol)
+mcp[cli]
+anyio
