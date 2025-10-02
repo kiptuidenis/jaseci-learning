@@ -1,0 +1,16 @@
+{
+  "entries": [
+    {
+      "mood": "not great",
+      "mood_score": 8,
+      "note": "",
+      "response": "AI unavailable: saved a neutral supportive message.",
+      "timestamp": "2025-09-29T19:03:37.226103",
+      "tags": [],
+      "energy_level": 3,
+      "gratitude": "nothing"
+    }
+  ],
+  "goals": [],
+  "last_updated": "2025-09-29T19:03:42.245720"
+}
