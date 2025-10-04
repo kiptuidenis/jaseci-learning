@@ -1,3 +1,27 @@
+sem adjust_difficulty = """
+Decide the next difficulty level of the game.
+
+Arguments:
+- correct_sequence: the list of digits shown to the player.
+- user_input: the list of digits the player typed.
+- difficulty: the current difficulty level.
+
+Return:
+- An integer representing the new difficulty level. 
+  Increase if correct, decrease (but not below 1) if incorrect.
+""";
+sem encouraging_feedback = """
+Generate an encouraging or corrective response.
+
+Arguments:
+- correct_sequence: the list of digits shown to the player.
+- user_input: the list of digits the player typed.
+
+Return:
+- A short motivational string that praises correctness 
+  or encourages the player to try again.
+""";
+
 # --- Walker implementations ---
 
 impl NumberMemoryGame.start_game {
