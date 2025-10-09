@@ -10,24 +10,42 @@ glob llm = Model(model_name="gemini/gemini-2.0-flash", verbose=False);
 def grade_student_code(rubric: str, code_data: dict[str, str]) -> dict[str, str] by llm;
 
 ::py::
+from urllib.parse import urlparse
+import re
+
 def extract_code_files(repo_url, extensions=(".jac", ".py", ".txt")):
+    # Handle GitHub subfolder links like .../tree/main/folder/subfolder
+    match = re.match(r"(https://github\.com/[^/]+/[^/]+)(/tree/[^/]+/(.*))?", repo_url.strip())
+    if not match:
+        raise ValueError("Invalid GitHub URL format")
+
+    base_repo = match.group(1) + ".git"  # Cloneable URL
+    subdir = match.group(3) or ""        # Optional subfolder inside repo
+
     temp_dir = tempfile.mkdtemp()
-    Repo.clone_from(repo_url.strip(), temp_dir)
-    
+    Repo.clone_from(base_repo, temp_dir)
+
+    # Navigate into subfolder if provided
+    target_dir = os.path.join(temp_dir, subdir) if subdir else temp_dir
+    if not os.path.exists(target_dir):
+        raise FileNotFoundError(f"Subfolder '{subdir}' not found in repo")
+
     code_data = {}
-    for root, _, files in os.walk(temp_dir):
+    for root, _, files in os.walk(target_dir):
         for file in files:
             if file.endswith(extensions):
                 file_path = os.path.join(root, file)
                 try:
                     with open(file_path, "r", encoding="utf-8") as f:
-                        relative_path = os.path.relpath(file_path, temp_dir)
+                        relative_path = os.path.relpath(file_path, target_dir)
                         code_data[relative_path] = f.read()
                 except Exception as e:
                     print(f"Skipping {file_path}: {e}")
+
     shutil.rmtree(temp_dir)
     return code_data
 ::py::
+
 
 with entry {
     st.set_page_config(page_title="AutoGrader", page_icon="🧠", layout="centered");
@@ -41,7 +59,7 @@ with entry {
         if not repo_url.startswith("https://github.com/") {
             st.error("Please enter a valid GitHub repository link.");
         } else {
-            with st.spinner("Cloning repository and grading... ⏳") {
+            with st.spinner("Grading... ⏳") {
                 # Extract code
                 code_files: dict[str, str] = extract_code_files(repo_url, extensions=(".jac",));
 
