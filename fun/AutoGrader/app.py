@@ -5,37 +5,27 @@ import shutil
 import tempfile
 from git import Repo
 import streamlit as st
+
+# 👇 Import Jac language support
 import jaclang  
-from grader import grade_student_code  # from grader.jac
+from grader import grade_student_code  # Import from grader.jac
 
-
-# --- Helper Function ---
+# --- Python helper ---
 def extract_code_files(repo_url, extensions=(".jac", ".py", ".txt")):
-    """
-    Clone a GitHub repo or subfolder and return a dictionary of code files.
-    Handles URLs like:
-      - https://github.com/user/repo
-      - https://github.com/user/repo/tree/main/folder
-    """
-    # ✅ Validate URL format — must include repo name
-    match = re.match(r"^https://github\.com/([^/]+)/([^/]+)(?:/tree/[^/]+/(.*))?$", repo_url.strip())
+    import re
+    match = re.match(r"(https://github\.com/[^/]+/[^/]+)(/tree/[^/]+/(.*))?", repo_url.strip())
     if not match:
-        raise ValueError("❌ Invalid GitHub URL. Please paste a valid repository link (not a profile link).")
+        raise ValueError("Invalid GitHub URL format")
 
-    user, repo, subdir = match.groups()
-    base_repo = f"https://github.com/{user}/{repo}.git"
+    base_repo = match.group(1) + ".git"
+    subdir = match.group(3) or ""
+
     temp_dir = tempfile.mkdtemp()
-
-    try:
-        Repo.clone_from(base_repo, temp_dir)
-    except Exception as e:
-        shutil.rmtree(temp_dir)
-        raise ValueError(f"⚠️ Failed to clone repository: {e}")
+    Repo.clone_from(base_repo, temp_dir)
 
     target_dir = os.path.join(temp_dir, subdir) if subdir else temp_dir
     if not os.path.exists(target_dir):
-        shutil.rmtree(temp_dir)
-        raise FileNotFoundError(f"📁 Subfolder '{subdir}' not found in repository.")
+        raise FileNotFoundError(f"Subfolder '{subdir}' not found in repo")
 
     code_data = {}
     for root, _, files in os.walk(target_dir):
@@ -44,13 +34,14 @@ def extract_code_files(repo_url, extensions=(".jac", ".py", ".txt")):
                 path = os.path.join(root, file)
                 try:
                     with open(path, "r", encoding="utf-8", errors="ignore") as f:
-                        rel = os.path.relpath(path, target_dir)
-                        code_data[rel] = f.read()
+                        relative = os.path.relpath(path, target_dir)
+                        code_data[relative] = f.read()
                 except Exception as e:
                     print(f"Skipping {path}: {e}")
 
     shutil.rmtree(temp_dir)
     return code_data
+
 
 
 # --- Streamlit UI ---
@@ -64,27 +55,20 @@ if st.button("🚀 Grade Now"):
     if not repo_url.startswith("https://github.com/"):
         st.error("Please enter a valid GitHub repository link.")
     else:
-        try:
-            with st.spinner("Grading... ⏳"):
-                code_files = extract_code_files(repo_url, extensions=(".jac",))
+        with st.spinner("Grading... ⏳"):
+            code_files = extract_code_files(repo_url, extensions=(".jac",))
 
-                rubric_path = os.path.join(os.path.dirname(__file__), "rubric.txt")
-                if not os.path.exists(rubric_path):
-                    st.error("Rubric file not found. Please add rubric.txt next to this script.")
-                else:
-                    with open(rubric_path, "r", encoding="utf-8") as f:
-                        rubric_text = f.read()
+            rubric_path = os.path.join(os.path.dirname(__file__), "rubric.txt")
+            if not os.path.exists(rubric_path):
+                st.error("Rubric file not found. Please add rubric.txt next to this script.")
+            else:
+                with open(rubric_path, "r", encoding="utf-8") as f:
+                    rubric_text = f.read()
 
-                    result = grade_student_code(rubric_text, code_files)
+                # 👇 Call the Jac function directly
+                result = grade_student_code(rubric_text, code_files)
 
-                    st.success("✅ Grading complete!")
-                    st.subheader("📊 Results")
-                    for key, value in result.items():
-                        st.write(f"**{key.title()}**: {value}")
-
-        except ValueError as e:
-            st.error(str(e))
-        except FileNotFoundError as e:
-            st.error(str(e))
-        except Exception as e:
-            st.error(f"❌ Unexpected error: {e}")
+                st.success("✅ Grading complete!")
+                st.subheader("📊 Results")
+                for key, value in result.items():
+                    st.write(f"**{key.title()}**: {value}")
