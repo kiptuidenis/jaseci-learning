@@ -5,12 +5,15 @@ A simple **Jaseci** script that uses **Gemini LLM** to automatically grade code 
 
 ---
 
-## 🧩 Clone the Repository
-Clone this project and open the AutoGrader folder:
+## 🧩 Clone only the Autograde Folder from the Jaseci-Learning Repository
 
 ```bash
-git clone https://github.com/kiptuidenis/jaseci-learning.git
-cd jaseci-learning/fun/AutoGrader
+git clone --no-checkout https://github.com/kiptuidenis/jaseci-learning.git
+cd jaseci-learning
+git sparse-checkout init --cone
+git sparse-checkout set fun/AutoGrader
+git checkout main
+cd fun/AutoGrader
 ```
 
 
