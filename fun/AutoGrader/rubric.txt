@@ -40,5 +40,6 @@ Evaluation Context
 The goal is to measure the student’s ability to:
 1. Model logic using graph traversal and walkers,
 2. Integrate AI reasoning or generation through `byLLM` in a meaningful way.
+Scores should be deterministic i.e given the same code multiple times should result in the same score.
 
 Return Overall Score out of 100%.
