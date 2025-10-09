@@ -41,7 +41,7 @@ cd fun/AutoGrader
 👉 Repo URL: https://github.com/student/assignment-repo
 
 
-**Customize the Rubric**
+# Customize the Rubric
 
 You can edit `rubric.txt` to change how grading is done.
 The LLM uses this text to decide grading criteria — so feel free to tweak it for different assignments.
