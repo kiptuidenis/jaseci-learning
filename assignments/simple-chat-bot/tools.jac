@@ -3,10 +3,13 @@ import requests;
 import from langchain_community.document_loaders {PyPDFDirectoryLoader, PyPDFLoader}
 import from langchain_text_splitters {RecursiveCharacterTextSplitter}
 import from langchain.schema.document {Document}
-import from langchain_openai {OpenAIEmbeddings}
 import from langchain_chroma {Chroma}
+import from langchain_huggingface {HuggingFaceEmbeddings}
 
-glob SEREPER_API_KEY: str = os.getenv('SERPER_API_KEY', '');
+
+
+
+glob SERPER_API_KEY: str = os.getenv('SERPER_API_KEY', '');
 
 obj RagEngine {
     has file_path: str = "docs";
@@ -47,9 +50,13 @@ obj RagEngine {
         return text_splitter.split_documents(documents);
     }
 
-    def get_embedding_function {
-        embeddings = OpenAIEmbeddings();
-        return embeddings;
+    
+def get_embedding_function {
+    # Uses free hosted inference API (requires token)
+    embeddings = HuggingFaceEmbeddings(
+        model_name="sentence-transformers/all-MiniLM-L6-v2"
+    );
+    return embeddings;
     }
 
     def add_chunk_id(chunks: str) {

@@ -36,13 +36,12 @@ impl NumberMemoryGame.start_game {
 impl NumberMemoryGame.announce_level {
     if [-->] {
         visit [-->];
-    } else {
-        choice: str = input(f"Are you ready for level {here.difficulty}? [Y/N] ");
-        if choice.lower() != "y" {
-            print("Exiting game. Goodbye!");
-            disengage;
-        }
     }
+    choice: str = input(f"Are you ready for level {here.difficulty}? [Y/N] ");
+    if choice.lower() != "y" {
+        report("Exiting game. Goodbye!");
+        disengage;
+        }
 }
 
 impl NumberMemoryGame.generate_sequence {
@@ -91,6 +90,6 @@ impl NumberMemoryGame.update_level {
         difficulty = new_diff,
         correct_sequence = []
     ))[0];
-
+    here.difficulty = new_diff;
     visit new_lvl;
 }
