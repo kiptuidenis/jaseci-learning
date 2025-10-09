@@ -4,11 +4,6 @@ A simple **Jaseci** script that uses **Gemini LLM** to automatically grade code 
 
 ---
 
-# 🧠 AutoGrader – Jaseci LLM-Powered Code Grader
-
-A simple **Jaseci** script that uses **Gemini LLM** to automatically grade code from a GitHub repo using a rubric.
-
----
 
 ## Clone the Repository
 Clone this project and open the AutoGrader folder:
