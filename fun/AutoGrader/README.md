@@ -6,7 +6,7 @@ A simple **Jaseci** script that uses **Gemini LLM** to automatically grade code 
 
 ## ⚙️ Requirements
 
-- **Python 3.10+**
+- **Python 3.12+**
 - **Jaclang** → `pip install jaclang`
 - **GitPython** → `pip install gitpython`
 - **byLLM** → `pip install byllm`
