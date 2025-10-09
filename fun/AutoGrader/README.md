@@ -4,7 +4,22 @@ A simple **Jaseci** script that uses **Gemini LLM** to automatically grade code 
 
 ---
 
-## ⚙️ Requirements
+# 🧠 AutoGrader – Jaseci LLM-Powered Code Grader
+
+A simple **Jaseci** script that uses **Gemini LLM** to automatically grade code from a GitHub repo using a rubric.
+
+---
+
+## Clone the Repository
+Clone this project and open the AutoGrader folder:
+
+```bash
+git clone https://github.com/kiptuidenis/jaseci-learning.git
+cd jaseci-learning/fun/AutoGrader
+
+
+
+## Requirements
 
 - **Python 3.12+**
 - **Jaclang** → `pip install jaclang`
@@ -15,14 +30,11 @@ A simple **Jaseci** script that uses **Gemini LLM** to automatically grade code 
 ### Set your Gemini API key:
 **Linux / macOS**
 `export GEMINI_API_KEY="your_api_key_here"`
+
+
 **Windows**
 `setx GEMINI_API_KEY "your_api_key_here"`
 
-**Project Structure**
-AutoGrader/
-├── grader.jac      # Main script
-├── rubric.txt      # Grading criteria
-└── README.md
 
 **Run the Grader**
 `jac run grader.jac`
