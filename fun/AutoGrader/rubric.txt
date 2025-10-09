@@ -1,0 +1,44 @@
+Rubric: Evaluating Jac Code Submissions
+---------------------------------------
+
+You are an expert Jac programming instructor.  
+You will evaluate a student’s Jac code submission based on how well it demonstrates key architectural concepts of the Jac language.  
+
+For each criterion below:
+- Assign a score (0–10)
+- Provide feedback (2–3 sentences)
+- Finally compute a TotalScore.
+
+---
+
+Criterion 1: Walking the Graph (0–10 pts)
+------------------------------------------
+Evidence to look for:
+- The code defines and uses walkers, nodes, and edges to represent and traverse a graph.
+- Walkers move through nodes using traversal syntax such as `visit [-->]`, `++>`, or similar.
+- The program’s logic reflects object-spatial thinking — computation expressed as entities moving and interacting through relationships rather than sequential control flow.
+- Demonstrates stopping, decision, or interaction conditions (`disengage`, events, or custom traversal rules).
+
+Full marks (9–10) if traversal is central to the program’s logic, clearly illustrating Jac’s graph-oriented paradigm.
+
+
+Criterion 2: AI Integration using byLLM (0–10 pts)
+--------------------------------------------------
+Evidence to look for:
+- The program imports and initializes `byllm` (e.g., `import from byllm.llm { Model }`).
+- Defines one or more functions or operations decorated or powered by `by llm()`.
+- Uses the LLM for meaningful computation: generating output, analyzing data, reasoning, or interaction beyond trivial calls.
+- The AI integration contributes to the program’s overall functionality.
+
+Full marks (9–10) if `byLLM` is seamlessly woven into the logic and used intelligently.
+
+---
+
+
+Evaluation Context
+------------------
+The goal is to measure the student’s ability to:
+1. Model logic using graph traversal and walkers,
+2. Integrate AI reasoning or generation through `byLLM` in a meaningful way.
+
+Return Overall Score out of 100%.
