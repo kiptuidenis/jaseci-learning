@@ -1,0 +1,7 @@
+streamlit
+gitpython
+byllm
+jaclang
+jac-streamlit
+jac-cloud
+python3.12
