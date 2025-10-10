@@ -6,7 +6,7 @@ import tempfile
 from git import Repo
 import streamlit as st
 
-# 👇 Import Jac language support
+# Import Jac language support
 import jaclang  
 from grader import grade_student_code  # Import from grader.jac
 
@@ -66,7 +66,7 @@ if st.button("🚀 Grade Now"):
                     with open(rubric_path, "r", encoding="utf-8") as f:
                         rubric_text = f.read()
 
-                    # 👇 Call the Jac function directly
+                    # Call the Jac function directly
                     result = grade_student_code(rubric_text, code_files)
 
                     st.success("✅ Grading complete!")
