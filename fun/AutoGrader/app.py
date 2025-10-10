@@ -56,19 +56,28 @@ if st.button("🚀 Grade Now"):
         st.error("Please enter a valid GitHub repository link.")
     else:
         with st.spinner("Grading... ⏳"):
-            code_files = extract_code_files(repo_url, extensions=(".jac",))
+            try:
+                code_files = extract_code_files(repo_url, extensions=(".jac",))
 
-            rubric_path = os.path.join(os.path.dirname(__file__), "rubric.txt")
-            if not os.path.exists(rubric_path):
-                st.error("Rubric file not found. Please add rubric.txt next to this script.")
-            else:
-                with open(rubric_path, "r", encoding="utf-8") as f:
-                    rubric_text = f.read()
+                rubric_path = os.path.join(os.path.dirname(__file__), "rubric.txt")
+                if not os.path.exists(rubric_path):
+                    st.error("Rubric file not found. Please add rubric.txt next to this script.")
+                else:
+                    with open(rubric_path, "r", encoding="utf-8") as f:
+                        rubric_text = f.read()
 
-                # 👇 Call the Jac function directly
-                result = grade_student_code(rubric_text, code_files)
+                    # 👇 Call the Jac function directly
+                    result = grade_student_code(rubric_text, code_files)
 
-                st.success("✅ Grading complete!")
-                st.subheader("📊 Results")
-                for key, value in result.items():
-                    st.write(f"**{key.title()}**: {value}")
+                    st.success("✅ Grading complete!")
+                    st.subheader("📊 Results")
+                    for key, value in result.items():
+                        st.write(f"**{key.title()}**: {value}")
+
+            except ValueError as ve:
+                st.error(f"⚠️ Invalid input: {ve}")
+            except FileNotFoundError as fnf:
+                st.error(f"📁 Error: {fnf}")
+            except Exception as e:
+                st.error("❌ An unexpected error occurred. Please check your URL or try again later.")
+                st.exception(e)  # Optional: shows the traceback for debugging (can be commented out)
