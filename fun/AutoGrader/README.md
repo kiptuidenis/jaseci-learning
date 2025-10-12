@@ -1,7 +1,8 @@
 
-# 🧠 AutoGrader – Jaseci LLM-Powered Code Grader
+# 🧠 AutoGrader
 
-A simple **Jaseci** script that uses **Gemini LLM** to automatically grade code from a GitHub repo using a rubric.
+A simple **Jac** script that uses **Gemini LLM** to automatically grade code from a GitHub repo using a rubric.
+https://jacautograder.streamlit.app/
 
 ---
 
@@ -45,3 +46,4 @@ cd fun/AutoGrader
 
 You can edit `rubric.txt` to change how grading is done.
 The LLM uses this text to decide grading criteria — so feel free to tweak it for different assignments.
+
