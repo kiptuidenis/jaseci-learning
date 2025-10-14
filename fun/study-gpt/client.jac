@@ -42,8 +42,21 @@ def bootstrap_frontend(token: str) {
                 if response.status_code == 200 {
                     data = response.json();
                     reply = data["reports"][0]["response"];
-                    st.write(reply);
-                    st.session_state.messages.append({"role": "assistant", "content": reply});
+
+                    if type(reply) == dict {
+                        ::py::
+                        for key, value in reply.items():
+                            st.markdown(f"{key}")
+                            st.markdown(value)
+                            st.session_state.messages.append({"role": "assistant", "content": f"{key}: {value}"})
+                        
+                        ::py::
+                    } else {
+                        st.markdown(reply);
+                        st.session_state.messages.append({"role": "assistant", "content": reply});
+                    }
+
+
                 } else {
                     st.error(f"Error: {response.text}");
                 }
@@ -77,6 +90,5 @@ with entry {
 
     token = response.json()["token"];
     print("Token:", token);
-
     bootstrap_frontend(token);
 }

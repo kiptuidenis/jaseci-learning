@@ -1,20 +1,22 @@
 import from byllm.llm {Model}
 import os;
 
-glob llm = Model(model_name="gemini/gemini-2.0-flash", verbose=True);
+glob llm = Model(model_name="gemini/gemini-2.5-flash", verbose=True);
 
 node Chat {
-    def respond(message: str, chat_history: list[dict]) -> str by llm(
+    # Ask the LLM to return a JSON object (dict) with "concepts": [ { "content": "..." }, ... ]
+    def respond_with_concepts(message: str, chat_history: list[dict[str, str]]) -> dict[str, str] by llm(
         messages=chat_history
     );
 
     can chat with infer entry;
 }
 
+
 walker infer {
     has message: str;
     has chat_history: list[dict];
-    has response: str = "";
+    has response: dict[str, str] = {};
 
     can init_chat with `root entry {
         visit [-->](`?Chat) else {
