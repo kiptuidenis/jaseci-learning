@@ -107,7 +107,7 @@ walker interact {
     }
 }
 
-
+  
 
 node Session {
     has id: str;

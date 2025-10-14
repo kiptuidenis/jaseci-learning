@@ -10,5 +10,5 @@ impl Chat.chat {
     self.chat_history = visitor.chat_history;
     visitor.response = response;
 
-    report {"response": response, "chat_history": visitor.chat_history};
+    #report {"response": response, "chat_history": visitor.chat_history};
 }
