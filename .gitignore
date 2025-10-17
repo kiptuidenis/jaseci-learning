@@ -1,2 +1,4 @@
 /jac-env/
-/test-env/
+/venv/
+/fun/chainlit-chat-bot/.env
+/assignments/simple-chat-bot/.env

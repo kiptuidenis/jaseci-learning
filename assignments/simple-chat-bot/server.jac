@@ -4,9 +4,17 @@ import from tools {RagEngine}
 import os;
 import base64;
 import mcp_client;
+import from dotenv {load_dotenv}
+::py::
+load_dotenv()
+::py::
+
 
 glob rag_engine:RagEngine = RagEngine();
-glob llm = Model(model_name="gemini/gemini-2.0-flash", verbose=True);
+glob llm = Model(
+    model_name="gemini/gemini-2.5-flash",
+    verbose=True
+);
 glob MCP_SERVER_URL: str = os.getenv('MCP_SERVER_URL', 'http://localhost:8899/mcp');
 
 
@@ -17,6 +25,7 @@ enum ChatType {
     VIDEO
 }
 
+
 node Router {
     def classify(message: str) -> ChatType by llm(method="Reason", temperature=0.8);
 }
@@ -24,6 +33,7 @@ node Router {
 node Chat {
     has chat_type: ChatType;
 }
+
 
 walker infer {
     has message: str;
@@ -34,17 +44,24 @@ walker infer {
     can init_router with `root entry {
         visit [-->](`?Router) else {
             router_node = here ++> Router();
-            router_node ++> RagChat();
-            router_node ++> QAChat();
-            router_node ++> ImageChat();
-            router_node ++> VideoChat();
+            router_node ++> RagChat(chat_type=ChatType.RAG);
+            router_node ++> QAChat(chat_type=ChatType.QA);
+            router_node ++> ImageChat(chat_type=ChatType.IMAGE);
+            router_node ++> VideoChat(chat_type=ChatType.VIDEO);
             visit router_node;
         }
     }
     can route with Router entry {
-        classification = here.classify(message = self.message);
-        print("Routing message:", self.message, "to chat type:", classification);
+    classification = here.classify(message=self.message);
+    print("🔍 Raw classification result:", classification);
+    print("Routing message:", self.message, "to chat type:", classification);
+
+    try {
         visit [-->](`?Chat)(?chat_type==classification);
+    } except ValueError {
+    print("⚠️ Routing failed — possible missing chat_type field");
+}
+
     }
 }
 
@@ -107,7 +124,7 @@ walker interact {
     }
 }
 
-  
+
 
 node Session {
     has id: str;

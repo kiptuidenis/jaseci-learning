@@ -3,23 +3,26 @@ import requests;
 import from langchain_community.document_loaders {PyPDFDirectoryLoader, PyPDFLoader}
 import from langchain_text_splitters {RecursiveCharacterTextSplitter}
 import from langchain.schema.document {Document}
+import from langchain_community.embeddings { OllamaEmbeddings }
 import from langchain_chroma {Chroma}
-import from langchain_huggingface {HuggingFaceEmbeddings}
-
-
-
+import from dotenv {load_dotenv}
+::py::
+load_dotenv()
+::py::
 
 glob SERPER_API_KEY: str = os.getenv('SERPER_API_KEY', '');
 
+
 obj RagEngine {
-    has file_path: str = "docs";
+    has file_path: str = "uploads/user_session_123";
     has chroma_path: str = "chroma";
+    has ollama_base_url: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:8050");
+    has embedding_model: str = "mxbai-embed-large";
 
     def postinit {
         if not os.path.exists(self.file_path) {
             os.makedirs(self.file_path);
         }
-
         documents: list = self.load_documents();
         chunks: list = self.split_documents(documents);
         self.add_to_chroma(chunks);
@@ -27,7 +30,13 @@ obj RagEngine {
 
     def load_documents {
         document_loader = PyPDFDirectoryLoader(self.file_path);
-        return document_loader.load();
+        docs = document_loader.load();
+        for i in range(min(3, len(docs))) {
+            doc = docs[i];
+            source = doc.metadata.get('source', 'unknown');
+            page = doc.metadata.get('page', 'unknown');
+        }
+        return docs;
     }
 
     def load_document(file_path: str) {
@@ -42,21 +51,21 @@ obj RagEngine {
     }
 
     def split_documents(documents: list[Document]) {
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=800,
-        chunk_overlap=80,
-        length_function=len,
-        is_separator_regex=False);
-
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=800,
+            chunk_overlap=80,
+            length_function=len,
+            is_separator_regex=False
+        );
         return text_splitter.split_documents(documents);
     }
 
-    
-def get_embedding_function {
-    # Uses free hosted inference API (requires token)
-    embeddings = HuggingFaceEmbeddings(
-        model_name="sentence-transformers/all-MiniLM-L6-v2"
-    );
-    return embeddings;
+    def get_embedding_function {
+        embeddings = OllamaEmbeddings(
+            model=self.embedding_model,
+            base_url=self.ollama_base_url
+        );
+        return embeddings;
     }
 
     def add_chunk_id(chunks: str) {
@@ -84,7 +93,10 @@ def get_embedding_function {
     }
 
     def add_to_chroma(chunks: list[Document]) {
-        db = Chroma(persist_directory=self.chroma_path, embedding_function=self.get_embedding_function());
+        db = Chroma(
+            persist_directory=self.chroma_path,
+            embedding_function=self.get_embedding_function()
+        );
         chunks_with_ids = self.add_chunk_id(chunks);
 
         existing_items = db.get(include=[]);
@@ -97,7 +109,7 @@ def get_embedding_function {
             }
         }
 
-        if len(new_chunks)  {
+        if len(new_chunks) {
             print('adding new documents');
             new_chunk_ids = [chunk.metadata['id'] for chunk in new_chunks];
             db.add_documents(new_chunks, ids=new_chunk_ids);
@@ -106,28 +118,31 @@ def get_embedding_function {
         }
     }
 
-    def get_from_chroma(query: str, chunk_nos: int=5){
-        db = chroma(
-            persist_directory = self.chroma_path,
-            embedding_function = self.get_embedding_function()
+    def get_from_chroma(query: str, chunck_nos: int = 5) {
+        db = Chroma(
+            persist_directory=self.chroma_path,
+            embedding_function=self.get_embedding_function()
         );
-        results = db.similarity_search_with_score(query, k=chunk_nos);
+        results = db.similarity_search_with_score(query, k=chunck_nos);
         return results;
     }
 
-    def search(query: str, chunk_nos: int=5) {
-        results = self.get_from_chroma(query=query, chunk_nos=chunk_nos);
+    def search(query: str, chunck_nos: int = 5) {
+        results = self.get_from_chroma(query=query, chunck_nos=chunck_nos);
         summary = "";
-        for (doc, score) in results {
+        for i in range(len(results)) {
+            doc = results[i][0];
+            score = results[i][1];
             page = doc.metadata.get('page');
             source = doc.metadata.get('source');
-            chunk_txt = doc.page_content[:400];
+            chunk_txt = doc.page_content[0:400] if len(doc.page_content) > 400 else doc.page_content;
+            preview = chunk_txt[0:100] if len(chunk_txt) > 100 else chunk_txt;
             summary += f"{source} page {page}: {chunk_txt}\n";
         }
-
         return summary;
     }
 }
+
 
 obj WebSearch {
     has api_key: str = SERPER_API_KEY;
@@ -140,17 +155,15 @@ obj WebSearch {
         if resp.status_code == 200 {
             data = resp.json();
             summary = "";
-            results = data.get("organic", [] if isinstance(data, dict) else []);
+            results = data.get("organic", []) if isinstance(data, dict) else [];
             for r in results[:3] {
                 summary += f"{r.get('title', '')}: {r.get('link', '')}\n";
                 if r.get('snippet') {
                     summary += f"{r['snippet']}\n";
                 }
             }
-
             return summary;
         }
-        
         return f"Serper request failed: {resp.status_code}";
     }
 }

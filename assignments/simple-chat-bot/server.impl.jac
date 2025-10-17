@@ -4,7 +4,8 @@ sem ChatType = """ChatType enum defines the types of chat interactions. ChatType
 - IMAGE: For interactions involving image analysis or anything related to images, and follow up questions.
 - VIDEO: For interactions involving video analysis or video-related questions.
 """;
-sem Router.classify = "Classify the message as RAG, QA, or VIDEO. If classification fails, default to QA.";
+
+sem Router.classify = """Classify the message as RAG, QA, or VIDEO. If classification fails, default to QA.""";
 
 sem ImageChat.respond_with_image = """Answer the user's message(text) by referring to the provided image. Always refer to the given image, answer relevant to the given image.""";
 
@@ -27,7 +28,6 @@ impl ImageChat.chat {
     self.chat_history = visitor.chat_history;
     visitor.response = response;
     report {"response": response, "chat_history": visitor.chat_history};
-
 }
 
 impl VideoChat.chat {
@@ -44,26 +44,36 @@ impl VideoChat.chat {
     report {"response": response, "chat_history": visitor.chat_history};
 }
 
+
 impl RagChat.chat {
+    # Retrieve relevant docs
+    docs = rag_engine.search(visitor.message);
+
+
+    # Include docs as part of message context
+    context = "Relevant documents:\n" + "\n".join(docs);
+
+    response = self.respond(
+        message=visitor.message + "\n\n" + context,
+        chat_history=visitor.chat_history,
+    );
+
+    visitor.chat_history.append({"role": "assistant", "content": response});
+    self.chat_history = visitor.chat_history;
+    visitor.response = response;
+    report {"response": response, "chat_history": visitor.chat_history};
+}
+
+
+impl QAChat.chat {
     response = self.respond(
         message=visitor.message,
-        chat_history=visitor.chat_history
+        chat_history=visitor.chat_history,
     );
     visitor.chat_history.append({"role": "assistant", "content": response});
     self.chat_history = visitor.chat_history;
     visitor.response = response;
     report {"response": response, "chat_history": visitor.chat_history};
-
-}
-
-impl QAChat.chat {
-    response = self.respond(
-        message=visitor.message,
-        chat_history=visitor.chat_history
-    );
-    visitor.chat_history.append({"role": "assistant", "content": response});
-    visitor.response = response;
-    report  {"response": response, "chat_history": visitor.chat_history};
 }
 
 impl upload_file.save_doc {
@@ -90,15 +100,19 @@ impl upload_file.save_doc {
         "file_path": file_path,
         "added_to_rag": lower_name.endswith(".pdf") or lower_name.endswith(".txt")
     };
-
 }
 
-# Get available MCP tool names.
+"""Get available MCP tool names."""
 def list_mcp_tools() -> list[str] {
     return mcp_client.list_mcp_tools();
 }
 
-# Use tool. Ddo not make up tool names. Tool name must be available
-def use_mcp_tool(name:str, arguments: dict[str, str]) -> str {
+"""Use MCP tool to perform actions.
+name must be one of available tools from list_mcp_tools(), do not make up any tool names.
+
+Example input for `use_mcp_tool`:
+{"name": "tool_name", "arguments": {"query": "your query"}}
+"""
+def use_mcp_tool(name: str, arguments: dict[str, str]) -> str {
     return mcp_client.call_mcp_tool(name=name, arguments=arguments);
 }

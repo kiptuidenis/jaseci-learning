@@ -44,46 +44,17 @@ def bootstrap_frontend(token: str) {
                     reply = data["reports"][0]["response"];
 
                     if type(reply) == dict {
-    ::py::
-    for key, value in reply.items():
-        with st.container():
-            st.markdown(f"### {key}")
-            st.markdown(value)
-            
-            # Add a collapsible sub-chat option
-            with st.expander("💬 Ask more about this concept"):
-                sub_question = st.text_input(f"Follow-up on '{key}'", key=f"follow_{key}")
-                if st.button(f"Ask about {key}", key=f"btn_{key}"):
-                    sub_payload = {
-                        "message": sub_question or f"Tell me more about {key}",
-                        "session_id": st.session_state.session_id
+                        ::py::
+                        for key, value in reply.items():
+                            st.markdown(f"{key}")
+                            st.markdown(value)
+                            st.session_state.messages.append({"role": "assistant", "content": f"{key}: {value}"})
+                        
+                        ::py::
+                    } else {
+                        st.markdown(reply);
+                        st.session_state.messages.append({"role": "assistant", "content": reply});
                     }
-                    sub_response = requests.post(
-                        "http://localhost:8000/walker/interact",
-                        json=sub_payload,
-                        headers={"Authorization": f"Bearer {token}"}
-                    )
-                    if sub_response.status_code == 200:
-                        sub_data = sub_response.json()
-                        sub_reply = sub_data["reports"][0]["response"]
-                        st.markdown("#### Sub Chat Response:")
-                        if type(sub_reply) == dict:
-                            for sub_key, sub_value in sub_reply.items():
-                                st.markdown(f"**{sub_key}**")
-                                st.markdown(sub_value)
-                        else:
-                            st.markdown(sub_reply)
-                    else:
-                        st.error(f"Error: {sub_response.text}")
-
-            # store original message
-            st.session_state.messages.append({"role": "assistant", "content": f"{key}: {value}"})
-    ::py::
-} else {
-    st.markdown(reply);
-    st.session_state.messages.append({"role": "assistant", "content": reply});
-}
-
 
 
                 } else {
