@@ -12,7 +12,12 @@ load_dotenv()
 
 glob rag_engine:RagEngine = RagEngine();
 glob llm = Model(
-    model_name="gemini/gemini-2.5-flash",
+    model_name="ollama/phi3",
+    base_url=os.getenv('OLLAMA_BASE_URL', 'http://localhost:8050'),
+    verbose=True
+);
+glob llm_reason = Model(
+    model_name="gemini/gemini-2.0-flash",
     verbose=True
 );
 glob MCP_SERVER_URL: str = os.getenv('MCP_SERVER_URL', 'http://localhost:8899/mcp');
@@ -27,7 +32,7 @@ enum ChatType {
 
 
 node Router {
-    def classify(message: str) -> ChatType by llm(method="Reason", temperature=0.8);
+    def classify(message: str) -> ChatType by llm_reason(method="Reason", temperature=0.8);
 }
 
 node Chat {
