@@ -4,6 +4,7 @@ impl Supervisor.update_url {
 }
 
 impl RepoMapper.clone_repo {
+    print("Arrived at RepoMapper to clone the repository...");
     clone_result = utils.clone_repo(self.url);
         if (clone_result["success"]) {
             self.local_path = clone_result["path"];
