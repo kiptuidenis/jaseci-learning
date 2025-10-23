@@ -2,29 +2,28 @@ import utils;
 
 node Supervisor {
     has url: str = "";
-
 }
 
 walker receiveurl {
     obj __specs__ {
         static has auth: bool = False;
     }
+
     has url: str = "";
     has validation: dict[bool, str] = {};
 
     can execute with `root entry {
-        # verify the URL format
+        # Step 1: Validate the URL
         validation = utils.validate_github_repo(self.url);
 
-        # Step 2: Report results back to frontend
+        # Step 2: Always report something to the frontend
         if not validation["valid"] {
-            report validation["message"];
-            disengage;  # stop execution if invalid
+            report f"Error: {validation['message']}";
+            disengage;
         }
 
-        report validation["message"];
+        report f"Success: {validation['message']}";
 
-        # Step 3: Continue with Supervisor in later steps
+        # Step 3: (Future) Continue with Supervisor logic here later
     }
-     
 }
