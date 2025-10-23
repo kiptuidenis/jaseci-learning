@@ -2,10 +2,11 @@ import utils;
 
 node Supervisor {
     has url: str = "";
-    
+
     can update_url with receiveurl entry;
 
     can start_delegation with receiveurl entry {
+        print("Starting delegation to RepoMapper(still at supervisor)...");
         file_tree = delegate(url=self.url) spawn self;
     }
 }
@@ -25,10 +26,12 @@ walker delegate {
     has url: str = "";
 
     can visit_repomapper with Supervisor entry{
-        visit [-->](`?RepoMapper) else {
+        print("visiting RepoMapper(still at supervisor)...");
+        visit [here --> ](`?RepoMapper) else {
             new_mapper = RepoMapper(url=self.url);
-            attached_mapper = root ++> new_mapper;
+            attached_mapper = here ++> new_mapper;
             visit attached_mapper;
+            print("Created and visited new RepoMapper node.");
         }
     }
 }

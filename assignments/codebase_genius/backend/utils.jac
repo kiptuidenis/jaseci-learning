@@ -27,15 +27,26 @@ def validate_github_repo(url: str) -> <>dict {
 }
 
 
-def clone_repo(url: str) -> <>dict {
+def clone_repo(url: str) -> dict {
     try {
-        let temp_dir = tempfile.mkdtemp(prefix='repo_');
-        git.Repo.clone_from(url, temp_dir);
-        return
-        {'success' : True , 'path' : temp_dir , 'message' : f"Repository cloned successfully to {temp_dir}" };
+        
+        print("creating temp dir...");
+        temp_dir = tempfile.mkdtemp(prefix='repo_');
+        print("Finished creating temp dir:", temp_dir);
+        git.Repo.clone_from(url, temp_dir, depth=1, single_branch=True);
+        print("Cloning...");
+        return {
+            'success': True,
+            'path': temp_dir,
+            'message': f"Repository cloned (shallow) to {temp_dir}"
+        };
     } except Exception as e {
-        return
-        {'success' : False , 'path' : None , 'message' : f"Failed to clone repository: {str(e)}" };
+        return {
+            'success': False,
+            'path': None,
+            'message': f"Failed to clone repository: {str(e)}"
+        };
     }
 }
+
 

@@ -27,7 +27,7 @@ generate_button = st.button("Generate Docs")
 def send_to_backend(url: str):
     """Send the GitHub URL to the Jac backend and handle response."""
     try:
-        response = requests.post(BACKEND_URL, json={"url": url}, timeout=60)
+        response = requests.post(BACKEND_URL, json={"url": url}, timeout=240)
         if response.status_code == 200:
             result = response.json()
             reports = result.get("report") or result.get("reports")
@@ -58,7 +58,7 @@ if generate_button:
     else:
         with st.spinner("🔍 Validating GitHub URL..."):
             validation = send_to_backend(github_url.strip())
-            time.sleep(1)  # small UX delay for smoother experience
+            # time.sleep(1)  # small UX delay for smoother experience
 
         if validation["status"] == "invalid":
             st.error(validation["message"])
