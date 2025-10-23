@@ -1,5 +1,8 @@
 import re;
 import requests;
+import os;
+import tempfile;
+import git;
 
 def validate_github_repo(url: str) -> <>dict {
     let pattern = '^https:\\/\\/github\\.com\\/([\\w\\-]+)\\/([\\w\\-]+)(\\.git)?\\/?$';
@@ -22,3 +25,17 @@ def validate_github_repo(url: str) -> <>dict {
         return {'valid': False, 'message': f"Error validating repository: {str(e)}"};
     }
 }
+
+
+def clone_repo(url: str) -> <>dict {
+    try {
+        let temp_dir = tempfile.mkdtemp(prefix='repo_');
+        git.Repo.clone_from(url, temp_dir);
+        return
+        {'success' : True , 'path' : temp_dir , 'message' : f"Repository cloned successfully to {temp_dir}" };
+    } except Exception as e {
+        return
+        {'success' : False , 'path' : None , 'message' : f"Failed to clone repository: {str(e)}" };
+    }
+}
+
