@@ -30,19 +30,24 @@ def send_to_backend(url: str):
         response = requests.post(BACKEND_URL, json={"url": url}, timeout=60)
         if response.status_code == 200:
             result = response.json()
-            if "report" in result:
-                # Extract validation message
-                message = result["report"][0]
+
+            # Check both possible keys: 'report' or 'reports'
+            reports = result.get("report") or result.get("reports")
+
+            if reports:
+                message = reports[0]
                 if "✅" in message:
                     return {"status": "valid", "message": message}
                 else:
                     return {"status": "invalid", "message": message}
             else:
-                return {"status": "error", "message": "Unexpected backend response structure."}
+                return {"status": "error", "message": f"Unexpected backend response: {result}"}
+
         else:
             return {"status": "error", "message": f"Backend returned {response.status_code}: {response.text}"}
     except requests.exceptions.RequestException as e:
         return {"status": "error", "message": f"Failed to connect to backend: {e}"}
+
 
 
 # ---------------------------
