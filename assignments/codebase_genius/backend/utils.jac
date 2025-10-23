@@ -2,10 +2,9 @@ import re;
 import requests;
 
 def validate_github_repo(url: str) -> <>dict {
-    # Allow optional trailing slash at the end
     let pattern = '^https:\\/\\/github\\.com\\/([\\w\\-]+)\\/([\\w\\-]+)(\\.git)?\\/?$';
     if not re.match(pattern, url) {
-        return {'valid': False, 'message': '❌ Invalid GitHub repository URL format.'};
+        return {'valid': False, 'message': 'Invalid GitHub repository URL format.'};
     }
     try {
         let <>match = re.match('^https:\\/\\/github\\.com\\/([\\w\\-]+)\\/([\\w\\-]+)', url);
