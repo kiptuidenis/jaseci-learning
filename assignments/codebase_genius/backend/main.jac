@@ -13,7 +13,6 @@ walker receiveurl {
     has validation: dict[bool, str] = {};
 
     can execute with `root entry {
-        print("Received URL: " + self.url);
         # verify the URL format
         validation = utils.validate_github_repo(self.url);
 
