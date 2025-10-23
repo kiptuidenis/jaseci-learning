@@ -2,6 +2,10 @@ import utils;
 
 node Supervisor {
     has url: str = "";
+    can execute with receiveurl entry {
+        self.url = visitor.url;
+        print(f"Supervisor received valid URL: {self.url}");
+    }
 }
 
 walker receiveurl {
@@ -24,6 +28,11 @@ walker receiveurl {
 
         report f"Success: {validation['message']}";
 
-        # Step 3: (Future) Continue with Supervisor logic here later
+        # Step 3: Continue with Supervisor 
+        visit [-->](`?Supervisor) else {
+            new_supervisor = Supervisor();
+            attached_supervisor = root ++> new_supervisor;
+            visit attached_supervisor;
+        }
     }
 }
