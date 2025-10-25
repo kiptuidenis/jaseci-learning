@@ -5,8 +5,9 @@ import time
 # ---------------------------
 # Configuration
 # ---------------------------
-BACKEND_URL_VALIDATE = "http://localhost:8000/walker/receiveurl"  # Validation walker
-BACKEND_URL_CLONE = "http://localhost:8000/walker/delegate"       # Cloning walker
+BACKEND_URL = "http://localhost:8000/walker"  # Base URL
+VALIDATE_ENDPOINT = f"{BACKEND_URL}/receiveurl"
+CLONE_ENDPOINT = f"{BACKEND_URL}/start_cloning"
 
 st.set_page_config(page_title="Codebase Genius", page_icon="🧠", layout="centered")
 
@@ -22,26 +23,42 @@ github_url = st.text_input("🔗 GitHub Repository URL", placeholder="https://gi
 
 generate_button = st.button("Generate Docs")
 
-
 # ---------------------------
-# Helper functions
+# Helper: Send POST to Backend
 # ---------------------------
-def send_to_backend(url: str, endpoint: str):
-    """Send a POST request to the given Jac walker endpoint."""
+def send_to_backend(endpoint: str, payload: dict, timeout=240):
+    """Generic helper to send a POST request to backend."""
     try:
-        response = requests.post(endpoint, json={"url": url}, timeout=240)
+        response = requests.post(endpoint, json=payload, timeout=timeout)
         if response.status_code == 200:
             result = response.json()
             reports = result.get("report") or result.get("reports")
 
             if reports:
-                message = reports[0].strip()
-                if message.lower().startswith("success"):
-                    return {"status": "valid", "message": message.replace("Success:", "").strip()}
-                elif message.lower().startswith("error"):
-                    return {"status": "invalid", "message": message.replace("Error:", "").strip()}
+                # 🧠 Handle both dict and string types
+                first = reports[0]
+                if isinstance(first, dict):
+                    # Prefer backend 'message' field
+                    message = first.get("message", str(first))
+                elif isinstance(first, str):
+                    message = first.strip()
                 else:
-                    return {"status": "error", "message": f"Unexpected message: {message}"}
+                    message = str(first)
+
+                # Normalize message classification
+                if isinstance(first, dict):
+                    valid = first.get("valid", True)
+                    if valid:
+                        return {"status": "valid", "message": message}
+                    else:
+                        return {"status": "invalid", "message": message}
+                else:
+                    if message.lower().startswith("success"):
+                        return {"status": "valid", "message": message.replace("Success:", "").strip()}
+                    elif message.lower().startswith("error"):
+                        return {"status": "invalid", "message": message.replace("Error:", "").strip()}
+                    else:
+                        return {"status": "error", "message": f"Unexpected message: {message}"}
             else:
                 return {"status": "error", "message": "No reports returned from backend."}
         else:
@@ -51,15 +68,14 @@ def send_to_backend(url: str, endpoint: str):
 
 
 # ---------------------------
-# Main Logic
+# Logic when button clicked
 # ---------------------------
 if generate_button:
     if not github_url.strip():
         st.error("❌ Please enter a GitHub URL before proceeding.")
     else:
-        # Step 1: Validate the GitHub URL
         with st.spinner("🔍 Validating GitHub URL..."):
-            validation = send_to_backend(github_url.strip(), BACKEND_URL_VALIDATE)
+            validation = send_to_backend(VALIDATE_ENDPOINT, {"url": github_url.strip()})
 
         if validation["status"] == "invalid":
             st.error(validation["message"])
@@ -68,26 +84,27 @@ if generate_button:
             st.error(f"⚠️ Backend error: {validation['message']}")
 
         elif validation["status"] == "valid":
-            st.success(validation["message"])
+            st.success(f"✅ {validation['message']}")
 
-            # Step 2: Trigger repo cloning after validation
-            with st.spinner("🌀 Cloning repository... please wait."):
-                clone_status = send_to_backend(github_url.strip(), BACKEND_URL_CLONE)
+            # ---------------------------
+            # NEW: Trigger repository cloning
+            # ---------------------------
+            with st.spinner("🌀 Cloning repository... this may take a few moments."):
+                cloning = send_to_backend(CLONE_ENDPOINT, {"url": github_url.strip()}, timeout=300)
 
-            if clone_status["status"] == "valid":
-                st.success(f"✅ Repository cloned successfully! {clone_status['message']}")
-            elif clone_status["status"] == "invalid":
-                st.error(f"❌ Cloning failed: {clone_status['message']}")
+            if cloning["status"] == "valid":
+                st.success(f"📦 {cloning['message']}")
+                st.balloons()  # 🎈 just a visual celebration
+
+                # Proceed to next simulated documentation phase
+                with st.spinner("🧠 Generating docs... please wait..."):
+                    time.sleep(5)
+                    st.success("✅ Documentation generated successfully!")
+                    st.download_button(
+                        label="📄 Download Documentation (Markdown)",
+                        data="# Example Documentation\n\nThis is a placeholder doc.",
+                        file_name="docs.md",
+                        mime="text/markdown"
+                    )
             else:
-                st.error(f"⚠️ Unexpected cloning error: {clone_status['message']}")
-
-            # Step 3: Simulate doc generation phase (placeholder for future)
-            with st.spinner("🧠 Generating docs... this may take a few moments."):
-                time.sleep(3)
-                st.success("✅ Documentation generated successfully!")
-                st.download_button(
-                    label="📄 Download Documentation (Markdown)",
-                    data="# Example Documentation\n\nThis is a placeholder doc.",
-                    file_name="docs.md",
-                    mime="text/markdown"
-                )
+                st.error(f"❌ Cloning failed: {cloning['message']}")
