@@ -3,30 +3,49 @@ import utils;
 node Supervisor {
     has url: str = "";
 
-    can update_url with receiveurl entry;
 
-    can start_delegation with receiveurl entry {
+    can clone_repo with start_cloning entry {
         print("Starting delegation to RepoMapper(still at supervisor)...");
-        file_tree = delegate(url=self.url) spawn self;
+        cloning = delegate(url=self.url) spawn self;
+        if not cloning.cloning_status["valid"] {
+            report f"Error: {cloning.cloning_status['message']}";
+            disengage;
+        }
+        report f"Success: {cloning.cloning_status['message']}";
+        disengage;
     }
 }
+
 
 node RepoMapper {
     has url: str = "";
     has local_path: str = "";
-    has status: str = "pending";
+
 
     # clones repo and updates local_path and status
-    can clone_repo with delegate entry;
+    can clone_repo with delegate entry{
+        print("Arrived at RepoMapper to clone the repository...");
+        clone_result = utils.clone_repo(self.url);
+        if (clone_result["success"]) {
+            self.local_path = clone_result["path"];
+            self.status = True;
+            visitor.cloning_status = {"valid": self.status, 'message': 'Repository cloned successfully.'};
+            report visitor.cloning_status;
+            print(f"Repository cloned to: {self.local_path}");
+        } else {
+            self.status = False;
+            visitor.cloning_status = {"valid": self.status, 'message': f"Cloning failed: {clone_result['message']}"};
+            report visitor.cloning_status;
+            print(f"Cloning failed: {clone_result['message']}");
+        }
+    }
 
 
 }
 
 walker delegate {
-    obj __specs__ {
-        static has auth: bool = False;
-    }
     has url: str = "";
+    has cloning_status: dict[bool, str] = {};
 
     can visit_repomapper with Supervisor entry{
         print("visiting RepoMapper(still at supervisor)...");
@@ -47,6 +66,36 @@ walker receiveurl {
     has url: str = "";
     has validation: dict[bool, str] = {};
 
-    can validate_url with `root entry;
+    can validate_url with `root entry {
+              # Step 1: Validate the URL
+        validation = utils.validate_github_repo(self.url);
+
+        # Step 2: Always report something to the frontend
+        if not validation["valid"] {
+            report f"Error: {validation['message']}";
+            disengage;
+        }
+
+        report f"Success: {validation['message']}";
+        disengage;
+    }
       
+}
+
+walker start_cloning {
+    obj __specs__ {
+        static has auth: bool = False;
+    }
+
+    has url: str = "";
+    has cloning_status: dict[bool, str] = {};
+
+    can begin_cloning with `root entry{
+        visit [-->](`?Supervisor) else {
+            new_supervisor = Supervisor(url=self.url);
+            attached_supervisor = root ++> new_supervisor;
+            visit attached_supervisor;
+            print("Created and visited new Supervisor node.");
+        }
+    }
 }
