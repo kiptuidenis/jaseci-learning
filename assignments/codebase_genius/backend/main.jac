@@ -23,6 +23,9 @@ node RepoMapper {
 }
 
 walker delegate {
+    obj __specs__ {
+        static has auth: bool = False;
+    }
     has url: str = "";
 
     can visit_repomapper with Supervisor entry{
