@@ -1,9 +1,20 @@
 import utils;
-import file_tree;
+import file_tree_generator;
+import os;
+
+node Directory {
+    has path: str;
+    has name: str;
+}
+
+node File {
+    has path: str;
+    has name: str;
+}
 
 node Supervisor {
     has url: str = "";
-    has file_tree_root: Directory;
+
 
 
     can clone_repo with start_cloning entry {
@@ -19,10 +30,11 @@ node Supervisor {
 
     can build_file_tree with file_tree_generator entry {
         print("Visiting RepoMapper to build file tree...");
-        visit [-->](`?RepoMapper)(?url==self.url) else {
+        visit [-->](`?RepoMapper) else {
             report "Error: No cloned repository found.";
             disengage;
         }
+        
         
     }
 }
@@ -32,7 +44,7 @@ node Supervisor {
 node RepoMapper {
     has url: str = "";
     has local_path: str = "";
-
+    has root_dir: Directory | None = None;
 
     # clones repo and updates local_path and status
     can clone_repo with delegate entry{
@@ -54,7 +66,10 @@ node RepoMapper {
 
     # builds file tree from local_path
     can build_file_tree with file_tree_generator entry {
-        root_dir = utils.walk_directory(self.local_path);
+        root_dir = Directory(path=self.local_path, name=os.path.basename(self.url));
+        root_dir spawn BuildTreeWalker();
+        report "Success: File tree generated.";
+        disengage;
     }
 
 
@@ -123,5 +138,50 @@ walker file_tree_generator {
 
     can begin_file_tree_generation with `root entry{
         visit [-->](`?Supervisor);
+    }
+}
+
+walker BuildTreeWalker {
+    has ignore_dirs: list = [
+        ".git", "node_modules", "__pycache__", ".idea", ".vscode",
+        "dist", "build", ".pytest_cache", ".mypy_cache", ".DS_Store",
+        ".venv", "env", "venv", "coverage", ".next"
+    ];
+
+    has ignore_files: list = [
+        ".gitignore", ".env", ".env.local", ".DS_Store",
+        "Thumbs.db", "package-lock.json", "yarn.lock",
+        ".pylintrc", ".eslintcache", ".coverage", ".mypy_cache"
+    ];
+
+    can build_tree with Directory entry {
+        let entries = os.listdir(here.path);
+
+        for entry in entries {
+            let full_path = os.path.join(here.path, entry);
+
+            # Skip ignored directories
+            if entry in self.ignore_dirs {
+                continue;
+            }
+
+            # Skip ignored files
+            if entry in self.ignore_files or entry.endswith((".pyc", ".log", ".tmp")) {
+                continue;
+            }
+
+            if os.path.isdir(full_path) {
+                # It’s a subdirectory
+                let subdir_node = Directory(path=full_path, name=entry);
+                here ++> subdir_node;
+
+                # Recursively visit subdir
+                visit subdir_node;
+            } else {
+                # It’s a file
+                let file_node = File(path=full_path, name=entry);
+                here ++> file_node;
+            }
+        }
     }
 }

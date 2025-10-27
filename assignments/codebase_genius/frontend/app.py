@@ -8,6 +8,7 @@ import time
 BACKEND_URL = "http://localhost:8000/walker"  # Base URL
 VALIDATE_ENDPOINT = f"{BACKEND_URL}/receiveurl"
 CLONE_ENDPOINT = f"{BACKEND_URL}/start_cloning"
+FILE_TREE_ENDPOINT = f"{BACKEND_URL}/file_tree_generator"  # ✅ New endpoint
 
 st.set_page_config(page_title="Codebase Genius", page_icon="🧠", layout="centered")
 
@@ -35,17 +36,14 @@ def send_to_backend(endpoint: str, payload: dict, timeout=240):
             reports = result.get("report") or result.get("reports")
 
             if reports:
-                # 🧠 Handle both dict and string types
                 first = reports[0]
                 if isinstance(first, dict):
-                    # Prefer backend 'message' field
                     message = first.get("message", str(first))
                 elif isinstance(first, str):
                     message = first.strip()
                 else:
                     message = str(first)
 
-                # Normalize message classification
                 if isinstance(first, dict):
                     valid = first.get("valid", True)
                     if valid:
@@ -87,24 +85,38 @@ if generate_button:
             st.success(f"✅ {validation['message']}")
 
             # ---------------------------
-            # NEW: Trigger repository cloning
+            # STEP 2: Clone Repository
             # ---------------------------
             with st.spinner("🌀 Cloning repository... this may take a few moments."):
                 cloning = send_to_backend(CLONE_ENDPOINT, {"url": github_url.strip()}, timeout=300)
 
             if cloning["status"] == "valid":
                 st.success(f"📦 {cloning['message']}")
-                st.balloons()  # 🎈 just a visual celebration
+                
 
-                # Proceed to next simulated documentation phase
-                with st.spinner("🧠 Generating docs... please wait..."):
-                    time.sleep(5)
-                    st.success("✅ Documentation generated successfully!")
-                    st.download_button(
-                        label="📄 Download Documentation (Markdown)",
-                        data="# Example Documentation\n\nThis is a placeholder doc.",
-                        file_name="docs.md",
-                        mime="text/markdown"
-                    )
+                # ---------------------------
+                # ✅ NEW STEP 3: Generate File Tree
+                # ---------------------------
+                with st.spinner("🌲 Building project file tree..."):
+                    file_tree = send_to_backend(FILE_TREE_ENDPOINT, {"url": github_url.strip()}, timeout=300)
+
+                if file_tree["status"] == "valid":
+                    st.success(f"🌳 {file_tree['message']}")
+
+                    # ---------------------------
+                    # STEP 4: Generate Documentation
+                    # ---------------------------
+                    with st.spinner("🧠 Generating docs... please wait..."):
+                        time.sleep(5)
+                        st.success("✅ Documentation generated successfully!")
+                        st.download_button(
+                            label="📄 Download Documentation (Markdown)",
+                            data="# Example Documentation\n\nThis is a placeholder doc.",
+                            file_name="docs.md",
+                            mime="text/markdown"
+                        )
+                else:
+                    st.error(f"❌ File tree generation failed: {file_tree['message']}")
+
             else:
                 st.error(f"❌ Cloning failed: {cloning['message']}")

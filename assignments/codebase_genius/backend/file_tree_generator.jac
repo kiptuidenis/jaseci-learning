@@ -10,7 +10,6 @@ node File {
     has name: str;
 }
 
-import os;
 
 walker BuildTreeWalker {
     has ignore_dirs: list = [
@@ -63,12 +62,4 @@ walker TreeTraverser {
         backend = codebase_genius(`?Directory)(?name=="backend");
         print(backend);
     }
-}
-
-with entry {
-    let path: str = "/home/denis/jaseci-learning/assignments/codebase_genius";
-    root_dir = Directory(path=path, name=os.path.basename(path));
-    codebase_genius = root_dir spawn BuildTreeWalker();
-    print(codebase_genius);
-    root_dir spawn TreeTraverser();
 }

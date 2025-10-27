@@ -64,6 +64,6 @@ def walk_directory(path: str) -> list {
     }
 }
 
-def to_nodes_and_edges(file_tree: list) -> Directory{
+def to_nodes_and_edges(file_tree: list) -> Directory {
     
 }
