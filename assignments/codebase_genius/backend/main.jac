@@ -5,6 +5,8 @@ import os;
 node Directory {
     has path: str;
     has name: str;
+    has subdirectories: list[Directory] = [];
+    has files: list[File] = [];
 }
 
 node File {
@@ -14,8 +16,6 @@ node File {
 
 node Supervisor {
     has url: str = "";
-
-
 
     can clone_repo with start_cloning entry {
         print("Starting delegation to RepoMapper(still at supervisor)...");
@@ -40,9 +40,6 @@ node Supervisor {
         
         
 }
-
-
-
 
 node RepoMapper {
     has url: str = "";
@@ -219,6 +216,7 @@ walker BuildTreeWalker {
             if os.path.isdir(full_path) {
                 # It’s a subdirectory
                 let subdir_node = Directory(path=full_path, name=entry);
+                here.subdirectories.append(subdir_node);
                 here ++> subdir_node;
 
                 # Recursively visit subdir
@@ -226,6 +224,7 @@ walker BuildTreeWalker {
             } else {
                 # It’s a file
                 let file_node = File(path=full_path, name=entry);
+                here.files.append(file_node);
                 here ++> file_node;
             }
         }
@@ -234,7 +233,7 @@ walker BuildTreeWalker {
 
 walker TreeTraverser {
     can start_traversal with Directory entry {
-        codebase_genius = [-->](`?File);
+        codebase_genius = [-->](`?Directory);
         print(codebase_genius);
     }
 }
