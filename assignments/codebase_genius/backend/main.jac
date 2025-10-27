@@ -48,21 +48,23 @@ node RepoMapper {
     has url: str = "";
     has local_path: str = "";
     has root_dir: Directory | None = None;
+    has readme_summary: str = "";
 
     # clones repo and updates local_path and status
-    can clone_repo with delegate entry{
+    can clone_repo with delegate entry {
         self.url = visitor.url;
         print("Arrived at RepoMapper to clone the repository...");
         clone_result = utils.clone_repo(self.url);
+
         if (clone_result["success"]) {
             self.local_path = clone_result["path"];
             self.status = True;
-            visitor.cloning_status = {"valid": self.status, 'message': 'Repository cloned successfully.'};
+            visitor.cloning_status = {"valid": self.status, "message": "Repository cloned successfully."};
             report visitor.cloning_status;
             print(f"Repository cloned to: {self.local_path}");
         } else {
             self.status = False;
-            visitor.cloning_status = {"valid": self.status, 'message': f"Cloning failed: {clone_result['message']}"};
+            visitor.cloning_status = {"valid": self.status, "message": f"Cloning failed: {clone_result['message']}"};
             report visitor.cloning_status;
             print(f"Cloning failed: {clone_result['message']}");
         }
@@ -71,16 +73,43 @@ node RepoMapper {
     # builds file tree from local_path
     can build_file_tree with file_tree_generator entry {
         self.url = visitor.url;
+        print(f"Building file tree for repo at {self.local_path}...");
+        
         root_dir = Directory(path=self.local_path, name=os.path.basename(self.url));
-        root ++> root_dir;
         root_dir spawn BuildTreeWalker();
+        root ++> root_dir;
+
+        # --- Look for README files in root directory ---
+        readme_files = [root_dir -->](`?File)(?name=="README.md");
+        if (readme_files and len(readme_files) > 0) {
+            readme = readme_files[0];
+            print(f"Found README file: {readme.path}");
+            
+            # --- Try summarizing README safely ---
+            try {
+                readme_contents = utils.read_file_contents(readme.path);
+                readme_summary = utils.summarize_readme(readme_contents);
+                print(readme_summary);
+                if (readme_summary) {
+                    print("README summary generated successfully.");
+                    self.readme_summary = readme_summary;
+                } else {
+                    print("README summarization returned empty result.");
+                }
+            } except Exception as e {
+                print(f"Warning: README summarization failed — proceeding without it. Error: {e}");
+            }
+        } else {
+            print("No README file found in root directory.");
+        }
+
+        # --- Report success regardless of README summary status ---
         report "Success: File tree generated.";
         root_dir spawn TreeTraverser();
         disengage;
     }
-
-
 }
+
 
 walker delegate {
     has url: str = "";
@@ -209,3 +238,4 @@ walker TreeTraverser {
         print(codebase_genius);
     }
 }
+

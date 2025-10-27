@@ -3,6 +3,9 @@ import requests;
 import os;
 import tempfile;
 import git;
+import from byllm.llm { Model }
+
+glob llm = Model(model_name="gemini/gemini-2.0-flash", verbose=False);
 
 def validate_github_repo(url: str) -> <>dict {
     let pattern = '^https:\\/\\/github\\.com\\/([\\w\\-]+)\\/([\\w\\-]+)(\\.git)?\\/?$';
@@ -50,19 +53,21 @@ def clone_repo(url: str) -> dict {
 }
 
 
-def walk_directory(path: str) -> list {
-
+def read_file_contents(file_path: str) -> str {
     try {
-        results = [];
-        for (root_dir, dirs, files) in os.walk(path) {
-            results.append((root_dir, dirs, files));
+        with open(file_path, 'r', encoding='utf-8') as f {
+            return f.read();
         }
-        return results;
     } except Exception as e {
-        print(f"Error walking directory {path}: {str(e)}");
-        return [];
+        print(f"Error reading file {file_path}: {e}");
+        return '';
     }
 }
+
+
+
+def summarize_readme(path: str) -> str by llm();
+
 
 def to_nodes_and_edges(file_tree: list) -> Directory {
     
