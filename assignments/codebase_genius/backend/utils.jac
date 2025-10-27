@@ -50,3 +50,20 @@ def clone_repo(url: str) -> dict {
 }
 
 
+def walk_directory(path: str) -> list {
+
+    try {
+        results = [];
+        for (root_dir, dirs, files) in os.walk(path) {
+            results.append((root_dir, dirs, files));
+        }
+        return results;
+    } except Exception as e {
+        print(f"Error walking directory {path}: {str(e)}");
+        return [];
+    }
+}
+
+def to_nodes_and_edges(file_tree: list) -> Directory{
+    
+}

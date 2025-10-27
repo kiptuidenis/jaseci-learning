@@ -1,7 +1,9 @@
 import utils;
+import file_tree;
 
 node Supervisor {
     has url: str = "";
+    has file_tree_root: Directory;
 
 
     can clone_repo with start_cloning entry {
@@ -14,7 +16,17 @@ node Supervisor {
         report f"Success: {cloning.cloning_status['message']}";
         disengage;
     }
+
+    can build_file_tree with file_tree_generator entry {
+        print("Visiting RepoMapper to build file tree...");
+        visit [-->](`?RepoMapper)(?url==self.url) else {
+            report "Error: No cloned repository found.";
+            disengage;
+        }
+        
+    }
 }
+
 
 
 node RepoMapper {
@@ -38,6 +50,11 @@ node RepoMapper {
             report visitor.cloning_status;
             print(f"Cloning failed: {clone_result['message']}");
         }
+    }
+
+    # builds file tree from local_path
+    can build_file_tree with file_tree_generator entry {
+        root_dir = utils.walk_directory(self.local_path);
     }
 
 
@@ -93,9 +110,18 @@ walker start_cloning {
     can begin_cloning with `root entry{
         visit [-->](`?Supervisor) else {
             new_supervisor = Supervisor(url=self.url);
-            attached_supervisor = root ++> new_supervisor;
-            visit attached_supervisor;
+            visit new_supervisor;
             print("Created and visited new Supervisor node.");
         }
+    }
+}
+
+walker file_tree_generator {
+    obj __specs__ {
+        static has auth: bool = False;
+    }
+
+    can begin_file_tree_generation with `root entry{
+        visit [-->](`?Supervisor);
     }
 }
