@@ -72,6 +72,7 @@ node RepoMapper {
     can build_file_tree with file_tree_generator entry {
         self.url = visitor.url;
         root_dir = Directory(path=self.local_path, name=os.path.basename(self.url));
+        root ++> root_dir;
         root_dir spawn BuildTreeWalker();
         report "Success: File tree generated.";
         root_dir spawn TreeTraverser();
