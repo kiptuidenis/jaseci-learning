@@ -29,15 +29,18 @@ node Supervisor {
     }
 
     can build_file_tree with file_tree_generator entry {
+        print(self);
         print("Visiting RepoMapper to build file tree...");
-        visit [-->](`?RepoMapper) else {
-            report "Error: No cloned repository found.";
+        visit [-->](`?RepoMapper)(?url==self.url) else {
+            report "Error: No cloned repository found for this URL.";
             disengage;
         }
-        
-        
     }
+
+        
+        
 }
+
 
 
 
@@ -48,6 +51,7 @@ node RepoMapper {
 
     # clones repo and updates local_path and status
     can clone_repo with delegate entry{
+        self.url = visitor.url;
         print("Arrived at RepoMapper to clone the repository...");
         clone_result = utils.clone_repo(self.url);
         if (clone_result["success"]) {
@@ -66,9 +70,11 @@ node RepoMapper {
 
     # builds file tree from local_path
     can build_file_tree with file_tree_generator entry {
+        self.url = visitor.url;
         root_dir = Directory(path=self.local_path, name=os.path.basename(self.url));
         root_dir spawn BuildTreeWalker();
         report "Success: File tree generated.";
+        root_dir spawn TreeTraverser();
         disengage;
     }
 
@@ -123,8 +129,9 @@ walker start_cloning {
     has cloning_status: dict[bool, str] = {};
 
     can begin_cloning with `root entry{
-        visit [-->](`?Supervisor) else {
+        visit [-->](`?Supervisor)(?url==self.url) else {
             new_supervisor = Supervisor(url=self.url);
+            root ++> new_supervisor;
             visit new_supervisor;
             print("Created and visited new Supervisor node.");
         }
@@ -135,11 +142,20 @@ walker file_tree_generator {
     obj __specs__ {
         static has auth: bool = False;
     }
+    has url: str = "";
 
-    can begin_file_tree_generation with `root entry{
-        visit [-->](`?Supervisor);
+    can begin_file_tree_generation with `root entry {
+        print(self.url);
+        print("visiting supervisor to build file tree...");
+        visit [-->](`?Supervisor)(?url==self.url) else {
+            print("No supervisor found for this URL. Creating one...");
+            new_supervisor = Supervisor(url=self.url);
+            root ++> new_supervisor;
+            visit new_supervisor;
+        }
     }
 }
+
 
 walker BuildTreeWalker {
     has ignore_dirs: list = [
@@ -183,5 +199,12 @@ walker BuildTreeWalker {
                 here ++> file_node;
             }
         }
+    }
+}
+
+walker TreeTraverser {
+    can start_traversal with Directory entry {
+        codebase_genius = [-->](`?File);
+        print(codebase_genius);
     }
 }

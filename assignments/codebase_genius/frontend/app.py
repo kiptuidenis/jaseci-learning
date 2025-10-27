@@ -98,6 +98,7 @@ if generate_button:
                 # ✅ NEW STEP 3: Generate File Tree
                 # ---------------------------
                 with st.spinner("🌲 Building project file tree..."):
+                    time.sleep(5)
                     file_tree = send_to_backend(FILE_TREE_ENDPOINT, {"url": github_url.strip()}, timeout=300)
 
                 if file_tree["status"] == "valid":
