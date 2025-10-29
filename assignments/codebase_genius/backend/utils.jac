@@ -68,7 +68,3 @@ def read_file_contents(file_path: str) -> str {
 
 def summarize_readme(path: str) -> str by llm();
 
-
-def to_nodes_and_edges(file_tree: list) -> Directory {
-    
-}
