@@ -1,8 +1,11 @@
+import utils;
 import os;
 
 node Directory {
     has path: str;
     has name: str;
+    has subdirectories: list[Directory] = [];
+    has files: list[File] = [];
 }
 
 node File {
@@ -30,36 +33,48 @@ walker BuildTreeWalker {
         for entry in entries {
             let full_path = os.path.join(here.path, entry);
 
-            # Skip ignored directories
             if entry in self.ignore_dirs {
                 continue;
             }
 
-            # Skip ignored files
             if entry in self.ignore_files or entry.endswith((".pyc", ".log", ".tmp")) {
                 continue;
             }
 
             if os.path.isdir(full_path) {
-                # It’s a subdirectory
                 let subdir_node = Directory(path=full_path, name=entry);
+                #here.subdirectories.append(subdir_node);
                 here ++> subdir_node;
-
-                # Recursively visit subdir
                 visit subdir_node;
             } else {
-                # It’s a file
                 let file_node = File(path=full_path, name=entry);
+                #here.files.append(file_node);
                 here ++> file_node;
+                visit file_node;
             }
         }
     }
 }
 
 walker TreeTraverser {
+    has file_list: list = [];
+
     can start_traversal with Directory entry {
-        codebase_genius = [-->];
-        backend = codebase_genius(`?Directory)(?name=="backend");
-        print(backend);
-    }
+                 visit [-->] else{
+                disengage;
+    }     
+}
+
+can start_file_traversal with File entry {
+        self.file_list.append(here.name);                
+}
+}
+
+with entry {
+    root_dir = Directory(path="/home/denis/jaseci-learning/assignments/codebase_genius", name=os.path.basename("/home/denis/jaseci-learning/assignments/codebase_genius"));
+    root_dir spawn BuildTreeWalker();
+    root ++> root_dir;
+    files = root_dir spawn TreeTraverser();
+    print(f"All files collected: {files.file_list}");
+
 }
