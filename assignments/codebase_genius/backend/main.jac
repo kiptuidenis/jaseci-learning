@@ -16,6 +16,8 @@ node File {
 
 node Supervisor {
     has url: str = "";
+    has root_dir: Directory | None | dict = None;
+    has readme_summary: str = "";
 
     can clone_repo with start_cloning entry {
         print("Starting delegation to RepoMapper (still at Supervisor)...");
@@ -38,6 +40,17 @@ node Supervisor {
             report "Error: No cloned repository found for this URL.";
             disengage;
         }
+        #print(f"This is File Tree returned to Supervisor!!: {file_tree}");
+    }
+
+    can update_info with CarryReadMeAndRootDir entry {
+        print("Updating Supervisor with README summary and root directory...");
+
+        self.root_dir = visitor.root_dir;
+        self.readme_summary = visitor.readme_summary;
+        print(f"Updated readme summary: {self.readme_summary}");
+        print(f"Updated root directory: {self.root_dir}");
+        disengage;
     }
 }
 
@@ -110,6 +123,7 @@ node RepoMapper {
 
         report "Success: File tree generated.";
         root_dir spawn TreeTraverser();
+        root spawn CarryReadMeAndRootDir(root_dir=root_dir, readme_summary=self.readme_summary, url=self.url);
         print(f"This is the type of root_dir: {type(root_dir)}");
         disengage;
     }
@@ -176,6 +190,8 @@ walker file_tree_generator {
     }
 
     has url: str = "";
+    has root_dir: Directory | None = None;
+    has readme_summary: str = "";
 
     can begin_file_tree_generation with `root entry {
         print(self.url);
@@ -246,4 +262,17 @@ can start_file_traversal with File entry {
         print("\n");
                 
 }
+}
+
+walker CarryReadMeAndRootDir {
+
+    has root_dir: Directory | None = None;
+    has readme_summary: str = "";
+    has url: str = "";
+
+    can carry_info with `root entry {
+        visit [-->](`?Supervisor)(?url==self.url) else {
+            disengage;
+        }
+    }
 }
