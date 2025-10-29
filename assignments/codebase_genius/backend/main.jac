@@ -1,5 +1,5 @@
 import utils;
-import file_tree_generator;
+#import file_tree_generator;
 import os;
 
 node Directory {
@@ -124,7 +124,6 @@ node RepoMapper {
         report "Success: File tree generated.";
         root_dir spawn TreeTraverser();
         root spawn CarryReadMeAndRootDir(root_dir=root_dir, readme_summary=self.readme_summary, url=self.url);
-        print(f"This is the type of root_dir: {type(root_dir)}");
         disengage;
     }
 }

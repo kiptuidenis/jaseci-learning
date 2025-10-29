@@ -68,3 +68,19 @@ def read_file_contents(file_path: str) -> str {
 
 def summarize_readme(path: str) -> str by llm();
 
+sem find_entry_files = """
+You are an expert software repository analyzer.
+
+Your task is to infer which files in a given  list of file paths are likely to be the main entry points of the project.
+
+Entry points are files where program execution typically starts — for example (these are just examples, not an exhaustive list):
+- Python: main.py, app.py, run.py, manage.py, cli.py, server.py
+- Jac: main.jac cli.jac, run.jac
+- Other indicative names like index.py, launcher.py, start.py, etc.
+
+You will be given a list of file paths from a repository. 
+Analyze them intelligently using file path semantics and return list of file paths that are most likely to be entry points of the project.
+if you find similar names return file paths """;
+
+def find_entry_files(file_list_path: list) -> list[str] by llm();
+
