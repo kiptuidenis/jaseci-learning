@@ -1,48 +1,32 @@
 import utils;
 import os;
+import subprocess;
 import ast;
 import jedi;
-import subprocess;
 import uuid;
 
 node Directory {
-    has uid: str = "";
-    has path: str = "";
-    has name: str = "";
+    has path: str;
+    has name: str;
     has subdirectories: list[Directory] = [];
     has files: list[File] = [];
 }
 
 node File {
     has uid: str = "";
-    has path:  str = "";
-    has name: str;
-}
-
-node Module {
-    has uid: str = "";
     has path: str = "";
-    has name: str  = "";
-    has classes: list[ClassNode] = [];
-    has functions: list[FunctionNode] = [];
+    has name: str = "";
 }
 
-node ClassNode {
+node Class {
     has uid: str = "";
     has name: str = "";
-    has file_path: str = "";
-    has methods: list[FunctionNode] = [];
 }
 
-node FunctionNode {
+node Function {
     has uid: str = "";
     has name: str = "";
-    has args: list[str] = [];
-    has docstring: str = "";
-    has file_path: str = "";
-    has class_name: str = "";
 }
-
 
 walker BuildTreeWalker {
     has ignore_dirs: list = [
@@ -72,19 +56,11 @@ walker BuildTreeWalker {
             }
 
             if os.path.isdir(full_path) {
-                let subdir_node = Directory(
-                    path=full_path,
-                    name=entry,
-                    uid=str(uuid.uuid5(uuid.NAMESPACE_URL, full_path))
-                );
+                let subdir_node = Directory(path=full_path, name=entry);
                 here ++> subdir_node;
                 visit subdir_node;
             } else {
-                let file_node = File(
-                    path=full_path,
-                    name=entry,
-                    uid=str(uuid.uuid5(uuid.NAMESPACE_URL, full_path))
-                );
+                let file_node = File(uid=str(uuid.uuid4()), path=full_path, name=entry);
                 here ++> file_node;
                 visit file_node;
             }
@@ -92,15 +68,12 @@ walker BuildTreeWalker {
     }
 }
 
-
 walker TreeTraverser {
     has file_list: list = [];
     has file_list_path: list = [];
 
     can start_traversal with Directory entry {
-        visit [-->] else {
-            disengage;
-        }
+        visit [-->] else { disengage; }
     }
 
     can start_file_traversal with File entry {
@@ -109,123 +82,95 @@ walker TreeTraverser {
     }
 }
 
+walker BuildCCG {
 
-walker CodeAnalyzer {
-    can analyze with File entry {
+    can build_ccg with Directory entry {
+        visit [-->] else { disengage; }
+    }
+    can start_ccg with File entry {
         if here.name.endswith(".py") {
             try {
-                with open(here.path, "r") as f {
-                    source = f.read();
-                }
-                let tree = ast.parse(source);
+                let source_code = open(here.path).read();
+                let tree = ast.parse(source_code);
 
-                # Create unique identifier for this module
-                let module_node = Module(
-                    path=here.path,
-                    name=here.name,
-                    uid=str(uuid.uuid5(uuid.NAMESPACE_URL, here.path))
-                );
-                here ++> module_node;
+                for node in ast.walk(tree) {
+                    if isinstance(node, ast.ClassDef) {
+                        let class_node = Class(uid=str(uuid.uuid4()), name=node.name);
+                        here ++> class_node;
 
-                for node in ast.walk(tree){
-                    if isinstance(node, ast.ClassDef){
-                        let class_uid = str(uuid.uuid5(uuid.NAMESPACE_URL, here.path + ":" + node.name));
-                        let cls = ClassNode(name=node.name, file_path=here.path, uid=class_uid);
-                        module_node ++> cls;
-
-                        for child in node.body{
-                            if isinstance(child, ast.FunctionDef){
-                                let func_uid = str(uuid.uuid5(uuid.NAMESPACE_URL, here.path + ":" + node.name + "." + child.name));
-                                let fn = FunctionNode(
-                                    name=child.name,
-                                    args=[arg.arg for arg in child.args.args],
-                                    docstring=ast.get_docstring(child) or "",
-                                    file_path=here.path,
-                                    class_name=node.name,
-                                    uid=func_uid
-                                );
-                                cls.methods.append(fn);
-                                cls ++> fn;
+                        # attach methods
+                        for body_item in node.body {
+                            if isinstance(body_item, ast.FunctionDef) {
+                                let method_node = Function(uid=str(uuid.uuid4()), name=body_item.name);
+                                class_node ++> method_node;
                             }
                         }
-                    }
-                    elif isinstance(node, ast.FunctionDef){
-                        let func_uid = str(uuid.uuid5(uuid.NAMESPACE_URL, here.path + ":" + node.name));
-                        let fn = FunctionNode(
-                            name=node.name,
-                            args=[arg.arg for arg in node.args.args],
-                            docstring=ast.get_docstring(node) or "",
-                            file_path=here.path,
-                            uid=func_uid
-                        );
-                        module_node ++> fn;
+                    } elif isinstance(node, ast.FunctionDef) {
+                        let func_node = Function(uid=str(uuid.uuid4()), name=node.name);
+                        here ++> func_node;
                     }
                 }
-
-            except Exception as e{
-                print(f"AST parsing failed for {here.name}: {e}");
             }
 
-        elif here.name.endswith(".jac"){
-            try {
-                result = subprocess.run(
-                    ["jac", "tool", "ir", "ast", here.path],
-                    capture_output=True,
-                    text=True
-                );
-                if result.returncode == 0 {
-                    print(f"Jac AST for {here.name}: {result.stdout[:200]}...");
-                }
-                else{
-                    print(f"Error generating Jac AST: {result.stderr}");
-                }
             except Exception as e {
-                print(f"Jac AST parsing failed: {e}");
+                print(f"AST error in {here.path}: {e}");
             }
+            print(f"Processed file for CCG: {here.path}");
         }
+        
     }
 }
-}
-    }
-}
-
 
 
 with entry {
-    root_dir = Directory(
-        path="/home/denis/jaseci-learning/assignments/codebase_genius",
-        name=os.path.basename("/home/denis/jaseci-learning/assignments/codebase_genius"),
-        uid=str(uuid.uuid5(uuid.NAMESPACE_URL, "/home/denis/jaseci-learning/assignments/codebase_genius"))
-    );
-
+    root_dir = Directory(path="/home/denis/jaseci-learning/assignments/codebase_genius", name=os.path.basename("/home/denis/jaseci-learning/assignments/codebase_genius"));
     root_dir spawn BuildTreeWalker();
     root ++> root_dir;
-
     files = root_dir spawn TreeTraverser();
-    entry_files = utils.find_entry_files(files.file_list_path);
 
     py_files = [];
     jac_files = [];
-    for file_path in entry_files {
+
+    for file_path in files.file_list_path {
         if file_path.endswith(".py") {
             py_files.append(file_path);
-        } elif file_path.endswith(".jac") {
-            jac_files.append(file_path);    
+        } elif file_path.endswith(".jac") or file_path.endswith(".impl.jac") {
+            jac_files.append(file_path);
         }
     }
-    print(f"Python entry files: {py_files}");
-    print(f"Jac entry files: {jac_files}");
 
-    # Analyze Python and Jac files
-    for f in files.file_list_path {
-        if f.endswith(".py") or f.endswith(".jac") {
-            let file_node = File(
-                path=f,
-                name=os.path.basename(f),
-                uid=str(uuid.uuid5(uuid.NAMESPACE_URL, f))
-            );
-            root_dir ++> file_node;
-            file_node spawn CodeAnalyzer();
+    print(f"Python files: {py_files}");
+    print(f"Jac files: {jac_files}");
+
+    # Convert .jac → .py
+let converted_py_files = [];
+
+for jac_path in jac_files {
+    let result = subprocess.run(["jac", "tool", "ir", "py", jac_path],
+        capture_output=True, text=True);
+
+    if result.returncode == 0 {
+        # Replace .jac extension with .py in the same directory
+        let base_name = os.path.splitext(jac_path)[0] + ".py";
+
+        with open(base_name, "w") as f {
+            f.write(result.stdout);
         }
+
+        converted_py_files.append(base_name);
+        print(f"✅ Converted {jac_path} → {base_name}");
+    } else {
+        print(f"❌ Error converting {jac_path}: {result.stderr}");
     }
+}
+
+# Add converted .py files to parsing list
+    py_files.extend(converted_py_files);
+
+    #print(py_files);
+    # Build partial Code Context Graph
+    root_dir_updated = Directory(path="/home/denis/jaseci-learning/assignments/codebase_genius", name=os.path.basename("/home/denis/jaseci-learning/assignments/codebase_genius"));
+    root_dir_updated spawn BuildTreeWalker();
+    root ++> root_dir_updated;
+    root_dir_updated spawn BuildCCG();
 }
