@@ -1,6 +1,10 @@
 import utils;
-#import file_tree_generator;
 import os;
+import uuid;
+import subprocess;
+import ast;
+import jedi;
+
 
 node Directory {
     has path: str;
@@ -10,16 +14,29 @@ node Directory {
 }
 
 node File {
-    has path: str;
-    has name: str;
+    has uid: str = "";
+    has path: str = "";
+    has name: str = "";
 }
+
+node Class {
+    has uid: str = "";
+    has name: str = "";
+}
+
+node Function {
+    has uid: str = "";
+    has name: str = "";
+}
+
 
 node Supervisor {
     has url: str = "";
     has root_dir: Directory | None | dict = None;
+    has root_directory: Directory | None | dict = None;
     has readme_summary: str = "";
 
-    can clone_repo with start_cloning entry {
+    can clone_repo with StartCloning entry {
         print("Starting delegation to RepoMapper (still at Supervisor)...");
         cloning = delegate(url=self.url) spawn self;
 
@@ -50,6 +67,67 @@ node Supervisor {
         self.readme_summary = visitor.readme_summary;
         print(f"Updated readme summary: {self.readme_summary}");
         print(f"Updated root directory: {self.root_dir}");
+        disengage;
+    }
+
+    can build_partial_CCG with BuildCCG entry {
+        self.root_directory = Directory(path=self.root_dir["path"], name=self.root_dir["name"], subdirectories=self.root_dir["subdirectories"], files=self.root_dir["files"]);
+
+        print(self.root_directory);
+        self.root_directory spawn BuildTreeWalker();
+        files = self.root_directory spawn TreeTraverser();
+
+        py_files = [];
+        jac_files = [];
+
+        for file_path in files.file_list_path {
+            if file_path.endswith(".py") {
+                py_files.append(file_path);
+            } elif file_path.endswith(".jac") or file_path.endswith(".impl.jac") {
+                jac_files.append(file_path);
+            }
+        }
+
+        print(f"Python files: {py_files}");
+        print(f"Jac files: {jac_files}");
+
+        # Convert .jac → .py
+        let converted_py_files = [];
+
+        for jac_path in jac_files {
+            let result = subprocess.run(["jac", "tool", "ir", "py", jac_path],
+                capture_output=True, text=True);
+
+            if result.returncode == 0 {
+                # Replace .jac extension with .py in the same directory
+                let base_name = os.path.splitext(jac_path)[0] + ".py";
+
+                with open(base_name, "w") as f {
+                    f.write(result.stdout);
+                }
+
+                converted_py_files.append(base_name);
+                print(f"✅ Converted {jac_path} → {base_name}");
+            } else {
+                print(f"❌ Error converting {jac_path}: {result.stderr}");
+            }
+        }
+
+        # Add converted .py files to parsing list
+        py_files.extend(converted_py_files);
+
+        #print(py_files);
+        # Build partial Code Context Graph
+        root_dir_updated = Directory(path=self.root_directory.path, name=os.path.basename(self.root_directory.path));
+        root_dir_updated spawn BuildTreeWalker();
+        root ++> root_dir_updated;
+        partial_ccg = root_dir_updated spawn BuildPartialCCG();
+        if partial_ccg.is_built {
+            report "Success: Partial CCG built successfully.";
+        } else {
+            report "Error: Partial CCG build failed.";
+
+        }
         disengage;
     }
 }
@@ -165,7 +243,7 @@ walker receiveurl {
     }
 }
 
-walker start_cloning {
+walker StartCloning {
     obj __specs__ {
         static has auth: bool = False;
     }
@@ -173,7 +251,7 @@ walker start_cloning {
     has url: str = "";
     has cloning_status: dict[bool, str] = {};
 
-    can begin_cloning with `root entry {
+    can start_cloning with `root entry {
         visit [-->](`?Supervisor)(?url==self.url) else {
             new_supervisor = Supervisor(url=self.url);
             root ++> new_supervisor;
@@ -248,19 +326,17 @@ walker BuildTreeWalker {
 }
 
 walker TreeTraverser {
-    can start_traversal with Directory entry {
-        print(here);
-            print("\n");
-                 visit [-->] else{
-                disengage;
-    }     
-}
+    has file_list: list = [];
+    has file_list_path: list = [];
 
-can start_file_traversal with File entry {
-        print(here);
-        print("\n");
-                
-}
+    can start_traversal with Directory entry {
+        visit [-->] else { disengage; }
+    }
+
+    can start_file_traversal with File entry {
+        self.file_list.append(here.name);
+        self.file_list_path.append(here.path);
+    }
 }
 
 walker CarryReadMeAndRootDir {
@@ -275,3 +351,61 @@ walker CarryReadMeAndRootDir {
         }
     }
 }
+
+walker BuildPartialCCG {
+    has is_built: bool = False;
+
+    can build_ccg with Directory entry {
+        visit [-->] else {
+            report "Error: No files to process for CCG.";
+            disengage; }
+    }
+    can start_ccg with File entry {
+        if here.name.endswith(".py") {
+            try {
+                let source_code = open(here.path).read();
+                let tree = ast.parse(source_code);
+
+                for node in ast.walk(tree) {
+                    if isinstance(node, ast.ClassDef) {
+                        let class_node = Class(uid=str(uuid.uuid4()), name=node.name);
+                        here ++> class_node;
+
+                        # attach methods
+                        for body_item in node.body {
+                            if isinstance(body_item, ast.FunctionDef) {
+                                let method_node = Function(uid=str(uuid.uuid4()), name=body_item.name);
+                                class_node ++> method_node;
+                            }
+                        }
+                    } elif isinstance(node, ast.FunctionDef) {
+                        let func_node = Function(uid=str(uuid.uuid4()), name=node.name);
+                        here ++> func_node;
+                    }
+                }
+            }
+
+            except Exception as e {
+                print(f"AST error in {here.path}: {e}");
+            }
+            self.is_built = True;
+            print(f"Processed file for CCG: {here.path}");
+        }
+        
+    }
+}
+ walker BuildCCG {
+    obj __specs__ {
+        static has auth: bool = False;
+    }
+
+    has url: str = "";
+
+    can build_ccg with `root entry {
+        visit [-->](`?Supervisor)(?url==self.url) else {
+            report "Error: No Supervisor found for this URL.";
+            disengage;
+        }
+    }
+
+ }
