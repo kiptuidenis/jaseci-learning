@@ -3,9 +3,85 @@ import requests;
 import os;
 import tempfile;
 import git;
+import jedi, ast;
+import astroid;
+import sys;
+import importlib;
+import uuid;
+import from astroid { nodes }
 import from byllm.llm { Model }
 
 glob llm = Model(model_name="gemini/gemini-2.0-flash", verbose=False);
+
+import os;
+import astroid;
+
+def resolve_module_to_path(module_name: str, here_path: str, level: int=0, is_from: bool=False) -> str | None {
+    try {
+        let repo_root = os.getenv("REPO_ROOT") or os.getcwd();
+
+        if module_name and module_name != "" {
+            try {
+                let mod = astroid.MANAGER.ast_from_module_name(module_name);
+                if mod and getattr(mod, "file", None) and os.path.exists(mod.file) {
+                    return os.path.abspath(mod.file);
+                }
+            }
+            except Exception as _a { }
+
+            let parts = module_name.split(".");
+            let direct = os.path.join(repo_root, *parts) + ".py";
+            if os.path.exists(direct) {
+                return os.path.abspath(direct);
+            }
+
+            let pkg_init = os.path.join(repo_root, *parts, "__init__.py");
+            if os.path.exists(pkg_init) {
+                return os.path.abspath(pkg_init);
+            }
+        }
+
+        if level and level > 0 {
+            let rel = os.path.relpath(here_path, repo_root);
+            let pkg = os.path.splitext(rel)[0].replace(os.sep, ".");
+            let comps = pkg.split(".");
+            let prefix = comps[:len(comps)-level] if len(comps) >= level else [];
+            let full = ".".join(prefix + module_name.split(".")) if module_name and module_name != "" else ".".join(prefix);
+
+            if full and full != "" {
+                let parts2 = full.split(".");
+                let cand = os.path.join(repo_root, *parts2) + ".py";
+                if os.path.exists(cand) {
+                    return os.path.abspath(cand);
+                }
+
+                let cand2 = os.path.join(repo_root, *parts2, "__init__.py");
+                if os.path.exists(cand2) {
+                    return os.path.abspath(cand2);
+                }
+            }
+        }
+
+        let last = module_name.split(".")[-1] if module_name and module_name != "" else None;
+        if last {
+            for (root_dir_walk, dirs, files) in os.walk(repo_root) {
+                if any(p in root_dir_walk for p in ["/.git/", "/venv/", "/.venv/", "/env/"]) {
+                    continue;
+                }
+                if f"{last}.py" in files {
+                    return os.path.abspath(os.path.join(root_dir_walk, f"{last}.py"));
+                }
+            }
+        }
+
+        return None;
+    }
+    except Exception as e {
+        print(f"⚠️ resolve_module_to_path error: {e}");
+        return None;
+    }
+}
+
 
 def validate_github_repo(url: str) -> <>dict {
     let pattern = '^https:\\/\\/github\\.com\\/([\\w\\-]+)\\/([\\w\\-]+)(\\.git)?\\/?$';
@@ -84,3 +160,28 @@ if you find similar names return file paths """;
 
 def find_entry_files(file_list_path: list) -> list[str] by llm();
 
+::py::
+def resolve_imports_with_jedi(source, path):
+    script = jedi.Script(source, path=path)
+    tree = ast.parse(source)
+    resolved = []
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                name = alias.name.split('.')[0]
+                defs = script.goto(line=node.lineno, column=0)
+                for d in defs:
+                    if d.module_path:
+                        resolved.append((name, d.module_path))
+
+        elif isinstance(node, ast.ImportFrom):
+            mod = node.module
+            for alias in node.names:
+                name = alias.name
+                defs = script.goto(line=node.lineno, column=0)
+                for d in defs:
+                    if d.module_path:
+                        resolved.append((f"{mod}.{name}", d.module_path))
+    return resolved
+::py::

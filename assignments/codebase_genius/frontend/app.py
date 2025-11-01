@@ -74,7 +74,7 @@ if generate_button:
         st.error("❌ Please enter a GitHub URL before proceeding.")
     else:
         with st.spinner("🔍 Validating GitHub URL..."):
-            validation = send_to_backend(VALIDATE_ENDPOINT, {"url": github_url.strip()})
+            validation = send_to_backend(VALIDATE_ENDPOINT, {"url": github_url.strip()}, timeout=300)
 
         if validation["status"] == "invalid":
             st.error(validation["message"])
