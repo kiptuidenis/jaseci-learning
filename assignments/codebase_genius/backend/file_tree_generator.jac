@@ -2,8 +2,11 @@ import utils;
 import os;
 import subprocess;
 import ast;
-import jedi;
 import uuid;
+import astroid;
+import sys;
+import importlib;
+import from astroid { nodes }
 
 
 node Directory {
@@ -99,195 +102,95 @@ walker BuildFullCCG {
     }
 
     can analyze_file with File entry {
-    if here.name.endswith(".py") {
-        print(f"This is file {here.name} with path {here.path}");
+        if here.name.endswith(".py") {
+            print(f"This is file {here.name} with path {here.path}");
 
-        try {
-            import astroid;
-            import sys;
-            import os;
-            import importlib;
-            import uuid;
-            import from astroid { nodes }
+            try {
+                
 
-            # Ensure repo root and its parent are on sys.path for resolution
-            let repo_root = self.repo_root if self.root_dir_updated == None else self.root_dir_updated.path;
-            let parent_root = os.path.dirname(repo_root);
-            if parent_root not in sys.path {
-                sys.path.insert(0, parent_root);
-                print(f"🧭 Added parent directory to sys.path: {parent_root}");
-            }
-            if repo_root not in sys.path {
-                sys.path.insert(0, repo_root);
-                print(f"🧭 Added repo root to sys.path: {repo_root}");
-            }
+                # Ensure repo root and its parent are on sys.path for resolution
+                let repo_root = self.repo_root if self.root_dir_updated == None else self.root_dir_updated.path;
+                let parent_root = os.path.dirname(repo_root);
+                if parent_root not in sys.path {
+                    sys.path.insert(0, parent_root);
+                    print(f"🧭 Added parent directory to sys.path: {parent_root}");
+                }
+                if repo_root not in sys.path {
+                    sys.path.insert(0, repo_root);
+                    print(f"🧭 Added repo root to sys.path: {repo_root}");
+                }
 
-            let source_code = open(here.path).read();
-            let tree = astroid.parse(source_code);
-            print(f"📄 Analyzing imports in {here.name}...");
+                let source_code = open(here.path).read();
+                let tree = astroid.parse(source_code);
+                print(f"📄 Analyzing imports in {here.name}...");
 
-            # helper: try astroid then filesystem then repo search
-            def resolve_module_to_path(module_name: str, here_path: str, level: int=0, is_from: bool=False) -> str | None {
-                # module_name may be None for statements like 'from . import foo'
-                try {
-                    if module_name and module_name != "" {
-                        # try astroid
-                        try {
-                            let mod = astroid.MANAGER.ast_from_module_name(module_name);
-                            if mod and getattr(mod, "file", None) {
-                                let candidate = mod.file;
-                                if os.path.exists(candidate) {
-                                    return os.path.abspath(candidate);
+                # iterate over top-level import statements
+                for node in tree.body {
+                    try {
+                        if isinstance(node, nodes.Import) {
+                            for (name, alias) in node.names {
+                                let mod_name = name;
+                                print(f"🔎 Found Import: {mod_name}");
+                                let path_found = utils.resolve_module_to_path(mod_name, here.path, level=0, is_from=False);
+
+                                if path_found != None and path_found.startswith(repo_root) {
+                                    let finder = self.root_dir_updated spawn FileFinder(target_path=path_found);
+                                    if finder.found_node != None {
+                                        here +>:Imports:+> finder.found_node;
+                                        print(f"✅ Connected import: {here.name} → {finder.found_node.name} ({mod_name})");
+                                    } else {
+                                        print(f"⚠️ Internal import file not found in graph: {path_found} for module {mod_name}");
+                                    }
+                                } else {
+                                    print(f"🌐 Treated as external/unresolved import: {mod_name}");
                                 }
                             }
-                        }
-                        except Exception as _a {
-                            # fallthrough to filesystem checks
-                        }
+                        } elif isinstance(node, nodes.ImportFrom) {
+                            let modname = getattr(node, "modname", None);
+                            let level = getattr(node, "level", 0) or 0;
+                            print(f"🔎 Found ImportFrom: module='{modname}' level={level} names={[n[0] for n in node.names]}");
 
-                        # try direct join from repo root: repo_root/<module_name>.py or /<module_name>/__init__.py
-                        let parts = module_name.split(".");
-                        let direct = os.path.join(repo_root, *parts) + ".py";
-                        if os.path.exists(direct) {
-                            return os.path.abspath(direct);
-                        }
-                        let pkg_init = os.path.join(repo_root, *parts, "__init__.py");
-                        if os.path.exists(pkg_init) {
-                            return os.path.abspath(pkg_init);
-                        }
-                    }
+                            let candidate_path = utils.resolve_module_to_path(modname, here.path, level=level, is_from=True);
 
-                    # handle relative imports (level > 0)
-                    if level and level > 0 {
-                        # compute package for current file: e.g. tests.test_models.test_user
-                        let rel = os.path.relpath(here_path, repo_root);
-                        let pkg = os.path.splitext(rel)[0].replace(os.sep, ".");
-                        let comps = pkg.split(".");
-                        # parent prefix is comps up to -level
-                        if len(comps) >= level {
-                            let prefix = comps[:len(comps)-level];
-                        } else {
-                            let prefix = [];
-                        }
-
-                        if module_name and module_name != "" {
-                            let full = ".".join(prefix + module_name.split("."));
-                        } else {
-                            let full = ".".join(prefix);
-                        }
-
-                        if full and full != "" {
-                            let parts2 = full.split(".");
-                            let cand = os.path.join(repo_root, *parts2) + ".py";
-                            if os.path.exists(cand) {
-                                return os.path.abspath(cand);
-                            }
-                            let cand2 = os.path.join(repo_root, *parts2, "__init__.py");
-                            if os.path.exists(cand2) {
-                                return os.path.abspath(cand2);
-                            }
-                        }
-                    }
-
-                    # Last resort: search repo for file named like last segment
-                    let last = module_name.split(".")[-1] if module_name and module_name != "" else None;
-                    if last {
-                        for (root_dir_walk, dirs, files) in os.walk(repo_root) {
-                            # quick prune: skip venvs, .git
-                            if any(p in root_dir_walk for p in ["/.git/", "/venv/", "/.venv/", "/env/"]){
-                                continue;
-                            }
-                            if f"{last}.py" in files {
-                                # prefer matches where the on-disk path contains the module path segments
-                                let candidate = os.path.join(root_dir_walk, f"{last}.py");
-                                return os.path.abspath(candidate);
-                            }
-                        }
-                    }
-
-                    return None;
-                }
-                except Exception as e {
-                    print(f"⚠️ resolve_module_to_path error: {e}");
-                    return None;
-                }
-            }
-
-            # iterate over top-level import statements
-            for node in tree.body {
-                try {
-                    if isinstance(node, nodes.Import) {
-                        for (name, alias) in node.names {
-                            let mod_name = name;
-                            print(f"🔎 Found Import: {mod_name}");
-                            let path_found = resolve_module_to_path(mod_name, here.path, level=0, is_from=False);
-
-                            if path_found != None and path_found.startswith(repo_root) {
-                                let finder = self.root_dir_updated spawn FileFinder(target_path=path_found);
+                            if candidate_path != None and candidate_path.startswith(repo_root) {
+                                let finder = self.root_dir_updated spawn FileFinder(target_path=candidate_path);
                                 if finder.found_node != None {
                                     here +>:Imports:+> finder.found_node;
-                                    print(f"✅ Connected import: {here.name} → {finder.found_node.name} ({mod_name})");
+                                    print(f"✅ Connected from-import: {here.name} → {finder.found_node.name} (module {modname})");
                                 } else {
-                                    print(f"⚠️ Internal import file not found in graph: {path_found} for module {mod_name}");
+                                    print(f"⚠️ From-import target not found in graph: {candidate_path} for module {modname}");
                                 }
                             } else {
-                                print(f"🌐 Treated as external/unresolved import: {mod_name}");
-                            }
-                        }
-                    } elif isinstance(node, nodes.ImportFrom) {
-                        # ImportFrom: could be relative (node.level > 0)
-                        let modname = getattr(node, "modname", None);
-                        let level = getattr(node, "level", 0) or 0;
-                        print(f"🔎 Found ImportFrom: module='{modname}' level={level} names={[n[0] for n in node.names]}");
-                        
-                        # compute candidate resolution (handles relative imports)
-                        let candidate_path = resolve_module_to_path(modname, here.path, level=level, is_from=True);
-
-                        if candidate_path != None and candidate_path.startswith(repo_root) {
-                            let finder = self.root_dir_updated spawn FileFinder(target_path=candidate_path);
-                            if finder.found_node != None {
-                                here +>:Imports:+> finder.found_node;
-                                print(f"✅ Connected from-import: {here.name} → {finder.found_node.name} (module {modname})");
-                            } else {
-                                print(f"⚠️ From-import target not found in graph: {candidate_path} for module {modname}");
-                            }
-                        } else {
-                            # If specific names are imported from a package, attempt to find those names as files under the package
-                            if modname {
-                                for (n, alias) in node.names {
-                                    # try modname + '.' + n as module
-                                    let composed = f"{modname}.{n}";
-                                    let p2 = resolve_module_to_path(composed, here.path, level=level, is_from=True);
-                                    if p2 != None and p2.startswith(repo_root) {
-                                        let finder2 = self.root_dir_updated spawn FileFinder(target_path=p2);
-                                        if finder2.found_node != None {
-                                            here +>:Imports:+> finder2.found_node;
-                                            print(f"✅ Connected from-import (member-as-module): {here.name} → {finder2.found_node.name} ({composed})");
-                                            continue;
+                                if modname {
+                                    for (n, alias) in node.names {
+                                        let composed = f"{modname}.{n}";
+                                        let p2 = utils.resolve_module_to_path(composed, here.path, level=level, is_from=True);
+                                        if p2 != None and p2.startswith(repo_root) {
+                                            let finder2 = self.root_dir_updated spawn FileFinder(target_path=p2);
+                                            if finder2.found_node != None {
+                                                here +>:Imports:+> finder2.found_node;
+                                                print(f"✅ Connected from-import (member-as-module): {here.name} → {finder2.found_node.name} ({composed})");
+                                                continue;
+                                            }
                                         }
                                     }
                                 }
+                                print(f"🌐 External or unresolved from-import skipped: {modname}");
                             }
-
-                            print(f"🌐 External or unresolved from-import skipped: {modname}");
                         }
                     }
+                    except Exception as inner_e {
+                        print(f"❌ Error resolving a specific import in {here.path}: {inner_e}");
+                    }
                 }
-                except Exception as inner_e {
-                    print(f"❌ Error resolving a specific import in {here.path}: {inner_e}");
-                }
-            }
 
-        }
-        except Exception as e {
-            print(f"ASTROID error in {here.path}: {e}");
+            }
+            except Exception as e {
+                print(f"ASTROID error in {here.path}: {e}");
+            }
         }
     }
 }
-
-}
-
-
 
 walker BuildCCG {
 

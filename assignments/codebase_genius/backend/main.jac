@@ -1,3 +1,4 @@
+import from dotenv { load_dotenv }
 import utils;
 import os;
 import uuid;
@@ -35,6 +36,8 @@ node Supervisor {
     has root_dir: Directory | None | dict = None;
     has root_directory: Directory | None | dict = None;
     has readme_summary: str = "";
+    has partial_ccg_root: Directory | None | dict = None;
+
 
     can clone_repo with StartCloning entry {
         print("Starting delegation to RepoMapper (still at Supervisor)...");
@@ -71,7 +74,12 @@ node Supervisor {
     }
 
     can build_partial_CCG with BuildCCG entry {
-        self.root_directory = Directory(path=self.root_dir["path"], name=self.root_dir["name"], subdirectories=self.root_dir["subdirectories"], files=self.root_dir["files"]);
+        self.root_directory = Directory(
+            path=self.root_dir["path"],
+            name=self.root_dir["name"],
+            subdirectories=self.root_dir["subdirectories"],
+            files=self.root_dir["files"]
+        );
 
         print(self.root_directory);
         self.root_directory spawn BuildTreeWalker();
@@ -93,15 +101,14 @@ node Supervisor {
 
         # Convert .jac → .py
         let converted_py_files = [];
-
         for jac_path in jac_files {
-            let result = subprocess.run(["jac", "tool", "ir", "py", jac_path],
-                capture_output=True, text=True);
+            let result = subprocess.run(
+                ["jac", "tool", "ir", "py", jac_path],
+                capture_output=True, text=True
+            );
 
             if result.returncode == 0 {
-                # Replace .jac extension with .py in the same directory
                 let base_name = os.path.splitext(jac_path)[0] + ".py";
-
                 with open(base_name, "w") as f {
                     f.write(result.stdout);
                 }
@@ -113,23 +120,29 @@ node Supervisor {
             }
         }
 
-        # Add converted .py files to parsing list
         py_files.extend(converted_py_files);
 
-        #print(py_files);
-        # Build partial Code Context Graph
-        root_dir_updated = Directory(path=self.root_directory.path, name=os.path.basename(self.root_directory.path));
-        root_dir_updated spawn BuildTreeWalker();
-        root ++> root_dir_updated;
-        partial_ccg = root_dir_updated spawn BuildPartialCCG();
+        # --- Persist the partial CCG root node ---
+        self.partial_ccg_root = Directory(
+            path=self.root_directory.path,
+            name=os.path.basename(self.root_directory.path)
+        );
+
+        # Build under that new root
+        self.partial_ccg_root spawn BuildTreeWalker();
+        root ++> self.partial_ccg_root;
+
+        partial_ccg = self.partial_ccg_root spawn BuildPartialCCG();
+
         if partial_ccg.is_built {
             report "Success: Partial CCG built successfully.";
         } else {
             report "Error: Partial CCG build failed.";
-
         }
+
         disengage;
     }
+
 }
 
 node RepoMapper {
@@ -409,3 +422,7 @@ walker BuildPartialCCG {
     }
 
  }
+
+with entry {
+    load_dotenv();
+}
