@@ -95,6 +95,7 @@ walker TreeTraverser {
 walker BuildFullCCG {
     has repo_root: str = "";
     has root_dir_updated: Directory | None = None;
+    has file_count: int = 0;
 
     can build_full_ccg with Directory entry {
         print("🔎 Traversing repository for full CCG enrichment...");
@@ -102,12 +103,13 @@ walker BuildFullCCG {
     }
 
     can analyze_file with File entry {
+        
         if here.name.endswith(".py") {
             print(f"This is file {here.name} with path {here.path}");
 
             try {
                 
-
+                self.file_count += 1;
                 # Ensure repo root and its parent are on sys.path for resolution
                 let repo_root = self.repo_root if self.root_dir_updated == None else self.root_dir_updated.path;
                 let parent_root = os.path.dirname(repo_root);
@@ -183,13 +185,25 @@ walker BuildFullCCG {
                         print(f"❌ Error resolving a specific import in {here.path}: {inner_e}");
                     }
                 }
+                print(f"Number of files visited: {self.file_count}");
 
             }
             except Exception as e {
                 print(f"ASTROID error in {here.path}: {e}");
             }
-        }
+            #print("Visiting Classes and functions..");
+            visit [-->](`?Class)(`?Function);
+        }      
     }
+
+    can analyze_class with Class entry {
+
+    }
+
+    can analyze_function with Function entry {
+        
+    }
+
 }
 
 walker BuildCCG {
