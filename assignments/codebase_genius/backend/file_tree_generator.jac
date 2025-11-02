@@ -207,39 +207,39 @@ walker BuildFullCCG {
                         let inferred = list(base.infer());
                         print(f"This is infered : {inferred}");
                         for b in inferred {
-    try {
-        let base_path = "";
-        if hasattr(b, "file") and b.file != None {
-            base_path = os.path.abspath(b.file);
-        } elif hasattr(b.root(), "file") and b.root().file != None {
-            base_path = os.path.abspath(b.root().file);
-        } else {
-            base_path = here.path;
-        }
+                            try {
+                                let base_path = "";
+                                if hasattr(b, "file") and b.file != None {
+                                    base_path = os.path.abspath(b.file);
+                                } elif hasattr(b.root(), "file") and b.root().file != None {
+                                    base_path = os.path.abspath(b.root().file);
+                                } else {
+                                    base_path = here.path;
+                                }
 
-        print(f"📁 This is the base path of file where class: {base_path}");
+                                print(f"📁 This is the base path of file where class: {base_path}");
 
-        let base_name = getattr(b, "name", "");
-        print(f"🔍 Searching for base class '{base_name}' in {base_path}");
+                                let base_name = getattr(b, "name", "");
+                                print(f"🔍 Searching for base class '{base_name}' in {base_path}");
 
-        if base_path.startswith(self.repo_root) {
-            let finder = self.root_dir_updated spawn ClassFinder(
-                target_path=base_path,
-                target_name=base_name
-            );
-            if finder.found_node != None {
-                here +>:InheritsFrom:+> finder.found_node;
-                print(f"✅ Connected inheritance: {here.name} → {finder.found_node.name}");
-            } else {
-                print(f"⚠️ Base class '{base_name}' not found in graph for {here.name}");
-            }
-        } else {
-            print(f"🌐 External base class {base_name} ignored");
-        }
-    } except Exception as b_e {
-        print(f"❌ Error in base analysis: {b_e}");
-    }
-}
+                                if base_path.startswith(self.repo_root) {
+                                    let finder = self.root_dir_updated spawn ClassFinder(
+                                        target_path=base_path,
+                                        target_name=base_name
+                                    );
+                                    if finder.found_node != None {
+                                        here +>:InheritsFrom:+> finder.found_node;
+                                        print(f"✅ Connected inheritance: {here.name} → {finder.found_node.name}");
+                                    } else {
+                                        print(f"⚠️ Base class '{base_name}' not found in graph for {here.name}");
+                                    }
+                                } else {
+                                    print(f"🌐 External base class {base_name} ignored");
+                                }
+                            } except Exception as b_e {
+                                print(f"❌ Error in base analysis: {b_e}");
+                            }
+                        }
 
                     }
                     except Exception as base_e {
@@ -254,9 +254,98 @@ walker BuildFullCCG {
         }
     }
 
-    can analyze_function with Function entry {
-        # You can later extend this for call graph or reference edges
-        #print(f"🔧 Found function {here.name} in {here.path}");
+            can analyze_function with Function entry {
+        try {
+            print(f"🔧 Analyzing function {here.name} at {here.path}");
+            import astroid;
+
+            let source_code = open(here.path).read();
+            let tree = astroid.parse(source_code);
+
+            # find this specific function node
+            let func_nodes = [n for n in tree.body if isinstance(n, astroid.nodes.FunctionDef) and n.name == here.name];
+            if len(func_nodes) == 0 {
+                # might be inside a class body
+                for n in tree.body {
+                    if isinstance(n, astroid.nodes.ClassDef) {
+                        for inner in n.body {
+                            if isinstance(inner, astroid.nodes.FunctionDef) and inner.name == here.name {
+                                func_nodes.append(inner);
+                            }
+                        }
+                    }
+                }
+            }
+
+            # collect all function names in this file for fallback
+            let all_func_names = [n.name for n in tree.body if isinstance(n, astroid.nodes.FunctionDef)];
+            for n in tree.body {
+                if isinstance(n, astroid.nodes.ClassDef) {
+                    for inner in n.body {
+                        if isinstance(inner, astroid.nodes.FunctionDef) {
+                            all_func_names.append(inner.name);
+                        }
+                    }
+                }
+            }
+
+            for fnode in func_nodes {
+                print(f"📞 Searching calls inside function {fnode.name}...");
+                for call in fnode.nodes_of_class(astroid.nodes.Call) {
+                    try {
+                        let resolved = False;
+                        let inferred = list(call.func.infer());
+
+                        for target in inferred {
+                            if hasattr(target, "name") and hasattr(target, "root") and hasattr(target.root(), "file") {
+                                let target_name = getattr(target, "name", "");
+                                let target_path = os.path.abspath(target.root().file) if target.root().file != None else here.path;
+
+                                # only connect if it's internal
+                                if target_path.startswith(self.repo_root) and target_name != "" {
+                                    let finder = self.root_dir_updated spawn FunctionFinder(
+                                        target_path=target_path,
+                                        target_name=target_name
+                                    );
+                                    if finder.found_node != None {
+                                        here +>:Calls:+> finder.found_node;
+                                        print(f"✅ Connected call: {here.name} → {finder.found_node.name}");
+                                        resolved = True;
+                                    }
+                                }
+                            }
+                        }
+
+                        # fallback: local same-file calls by name match
+                        if not resolved {
+                            let call_name = getattr(call.func, "name", None);
+                            if call_name != None and call_name in all_func_names {
+                                let finder2 = self.root_dir_updated spawn FunctionFinder(
+                                    target_path=here.path,
+                                    target_name=call_name
+                                );
+                                if finder2.found_node != None {
+                                    here +>:Calls:+> finder2.found_node;
+                                    print(f"✅ Connected local call: {here.name} → {finder2.found_node.name}");
+                                    resolved = True;
+                                }
+                            }
+                        }
+
+                        if not resolved {
+                            print(f"🌐 External or unresolved call ignored: {getattr(call.func, 'name', 'unknown')}");
+                        }
+
+                    }
+                    except Exception as ce {
+                        print(f"❌ Error analyzing call in {here.name}: {ce}");
+                    }
+                }
+            }
+        }
+        except Exception as e {
+            print(f"❌ Error analyzing function {here.name}: {e}");
+        }
     }
 }
 
@@ -264,7 +353,7 @@ walker BuildFullCCG {
 walker BuildCCG {
 
     can build_ccg with Directory entry {
-        visit [-->] else { disengage; }
+        visit [-->];
     }
     can start_ccg with File entry {
         if here.name.endswith(".py") {
@@ -357,17 +446,16 @@ walker FunctionFinder {
     has found_node: Function | None = None;
 
     can find_function with Directory entry {
-        if self.found_node != None {
-            disengage;
-        }
-        visit [-->] else { disengage; }
+
+        visit [-->];
     }
 
     can check_file with File entry {
-        if self.found_node != None {
-            disengage;
-        }
-        visit [-->] else { disengage; }
+        visit [-->];
+    }
+
+    can check_class with Class entry {
+        visit [-->];
     }
 
     can check_function with Function entry {
