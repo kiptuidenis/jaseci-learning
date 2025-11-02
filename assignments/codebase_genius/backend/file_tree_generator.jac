@@ -103,30 +103,26 @@ walker BuildFullCCG {
     }
 
     can analyze_file with File entry {
-        
         if here.name.endswith(".py") {
             print(f"This is file {here.name} with path {here.path}");
-
             try {
-                
                 self.file_count += 1;
-                # Ensure repo root and its parent are on sys.path for resolution
+
                 let repo_root = self.repo_root if self.root_dir_updated == None else self.root_dir_updated.path;
                 let parent_root = os.path.dirname(repo_root);
                 if parent_root not in sys.path {
                     sys.path.insert(0, parent_root);
-                    print(f"🧭 Added parent directory to sys.path: {parent_root}");
+                   print(f"🧭 Added parent directory to sys.path: {parent_root}");
                 }
                 if repo_root not in sys.path {
                     sys.path.insert(0, repo_root);
-                    print(f"🧭 Added repo root to sys.path: {repo_root}");
+                   print(f"🧭 Added repo root to sys.path: {repo_root}");
                 }
 
                 let source_code = open(here.path).read();
                 let tree = astroid.parse(source_code);
                 print(f"📄 Analyzing imports in {here.name}...");
 
-                # iterate over top-level import statements
                 for node in tree.body {
                     try {
                         if isinstance(node, nodes.Import) {
@@ -144,7 +140,7 @@ walker BuildFullCCG {
                                         print(f"⚠️ Internal import file not found in graph: {path_found} for module {mod_name}");
                                     }
                                 } else {
-                                    print(f"🌐 Treated as external/unresolved import: {mod_name}");
+                                   print(f"🌐 Treated as external/unresolved import: {mod_name}");
                                 }
                             }
                         } elif isinstance(node, nodes.ImportFrom) {
@@ -182,29 +178,88 @@ walker BuildFullCCG {
                         }
                     }
                     except Exception as inner_e {
-                        print(f"❌ Error resolving a specific import in {here.path}: {inner_e}");
+                       print(f"❌ Error resolving a specific import in {here.path}: {inner_e}");
                     }
                 }
                 print(f"Number of files visited: {self.file_count}");
-
             }
             except Exception as e {
                 print(f"ASTROID error in {here.path}: {e}");
             }
-            #print("Visiting Classes and functions..");
-            visit [-->](`?Class)(`?Function);
-        }      
+            visit [-->](`?Class);
+        }
     }
 
     can analyze_class with Class entry {
+        try {
+            print(f"🏷️ Analyzing class {here.name} at {here.path}");
+            import astroid;
 
+            let source_code = open(here.path).read();
+            let tree = astroid.parse(source_code);
+            let class_nodes = [n for n in tree.body if isinstance(n, astroid.nodes.ClassDef) and n.name == here.name];
+            print(f"These are class nodes found: {class_nodes}");
+
+            for cnode in class_nodes {
+                for base in cnode.bases {
+                    print(f"These are bases in class_nodes: {base}");
+                    try {
+                        let inferred = list(base.infer());
+                        print(f"This is infered : {inferred}");
+                        for b in inferred {
+    try {
+        let base_path = "";
+        if hasattr(b, "file") and b.file != None {
+            base_path = os.path.abspath(b.file);
+        } elif hasattr(b.root(), "file") and b.root().file != None {
+            base_path = os.path.abspath(b.root().file);
+        } else {
+            base_path = here.path;
+        }
+
+        print(f"📁 This is the base path of file where class: {base_path}");
+
+        let base_name = getattr(b, "name", "");
+        print(f"🔍 Searching for base class '{base_name}' in {base_path}");
+
+        if base_path.startswith(self.repo_root) {
+            let finder = self.root_dir_updated spawn ClassFinder(
+                target_path=base_path,
+                target_name=base_name
+            );
+            if finder.found_node != None {
+                here +>:InheritsFrom:+> finder.found_node;
+                print(f"✅ Connected inheritance: {here.name} → {finder.found_node.name}");
+            } else {
+                print(f"⚠️ Base class '{base_name}' not found in graph for {here.name}");
+            }
+        } else {
+            print(f"🌐 External base class {base_name} ignored");
+        }
+    } except Exception as b_e {
+        print(f"❌ Error in base analysis: {b_e}");
+    }
+}
+
+                    }
+                    except Exception as base_e {
+                        print(f"❌ Error analyzing base class of {here.name}: {base_e}");
+                    }
+                }
+            }
+            visit [-->](`?Function);
+        }
+        except Exception as e {
+            print(f"❌ Error analyzing class {here.name}: {e}");
+        }
     }
 
     can analyze_function with Function entry {
-        
+        # You can later extend this for call graph or reference edges
+        #print(f"🔧 Found function {here.name} in {here.path}");
     }
-
 }
+
 
 walker BuildCCG {
 
@@ -265,7 +320,7 @@ walker FileFinder {
 
         if here.path == self.target_path {
             self.found_node = here;
-            print(f"✅ Found file node for {here.path}");
+            #print(f"✅ Found file node for {here.path}");
             disengage;
         }
     }
@@ -278,17 +333,11 @@ walker ClassFinder {
     has found_node: Class | None = None;
 
     can find_file with Directory entry {
-        if self.found_node != None {
-            disengage;
-        }
-        visit [-->] else { disengage; }
+        visit [-->]; #else { disengage; }
     }
 
     can check_file with File entry {
-        if self.found_node != None {
-            disengage;
-        }
-        visit [-->] else { disengage; }
+        visit [-->]; #else { disengage; }
     }
 
     can check_class with Class entry {
