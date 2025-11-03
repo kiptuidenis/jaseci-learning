@@ -54,13 +54,13 @@ node Supervisor {
 
     def extract_file(file_path: str) -> str;
     def call_finder(caller_name: str, caller_path: str, callee_name: str) -> str;
-    def class_hierarchies()-> str;
-    def import_finder()-> str;
-    def diagram_generator()-> str;
+    def class_hierarchies(child_name: str, child_path: str, parent_name: str) -> str;
+    def import_finder(importer_name: str, importer_path: str, imported_name: str) -> str;
+#    def diagram_generator()-> str;
 
     def doc_genie(ccg_root: Directory, readme_summary: str) ->  str by llm(
         method="ReAct",
-        tools=([self.extract_file, self.call_finder, self.class_hierarchies, self.import_finder, self.diagram_generator]),
+        tools=([self.extract_file, self.call_finder, self.class_hierarchies, self.import_finder]),
     );
 
     can clone_repo with StartCloning entry {
@@ -884,6 +884,102 @@ walker CallFinder {
 
 
 }
+walker InheritsFromFinder {
+    has child_name: str = "";
+    has child_path: str = "";
+    has parent_name: str = "";
+    has found_content: str = "";
+    has found_node: Class | None = None;
+
+    can find_parent with Directory entry {
+        # Visit all subnodes in the graph recursively
+        visit [-->];
+    }
+
+    can traverse_file with File entry {
+        visit [-->];
+    }
+
+    can traverse_class with Class entry {
+
+
+        # Step 1: Find the child class by name and file path
+        if here.name == self.child_name and here.path == self.child_path {
+            print(f"✅ Found child class '{here.name}' at {here.path}");
+
+            # Step 2: Traverse only the InheritsFrom edges to find the parent
+            visit [->:InheritsFrom:->(`?Class)](?name==self.parent_name);
+        } else {
+            visit [-->];
+        }
+    }
+
+    can check_parent with Class entry {
+
+        # Step 3: Once we’re visiting via InheritsFrom edge, match the parent class
+        if here.name == self.parent_name {
+            print(f"✅ Found parent class '{here.name}' at {here.path}");
+
+            if os.path.exists(here.path) {
+                self.found_node = here;
+                self.found_content = utils.read_file_contents(here.path);
+                print(f"📄 Extracted contents for parent class '{here.name}'");
+            } else {
+                print(f"⚠️ File not found for parent '{here.name}' at {here.path}");
+                self.found_content = "";
+            }
+
+            disengage;
+        }
+    }
+}
+
+walker ImportsFinder {
+    has importer_name: str = "";
+    has importer_path: str = "";
+    has imported_name: str = "";
+    has found_content: str = "";
+    has found_node: File | None = None;
+
+    can find_imported with Directory entry {
+        # Visit all subnodes recursively to locate the importer file first
+        visit [-->];
+    }
+
+    can check_file with File entry {
+
+        # Step 1: Find the importer file by name and path
+        if here.name == self.importer_name and here.path == self.importer_path {
+            print(f"✅ Found importer file '{here.name}' at {here.path}");
+
+            # Step 2: Traverse only the Imports edges from this file to its imports
+            visit [->:Imports:->(`?File)](?name==self.imported_name);
+        } else {
+            visit [-->];
+        }
+    }
+
+    can check_imported with File entry {
+
+        # Step 3: Once visiting via Imports edge, match the imported module
+        if here.name == self.imported_name {
+            print(f"✅ Found imported file '{here.name}' at {here.path}");
+
+            if os.path.exists(here.path) {
+                self.found_node = here;
+                self.found_content = utils.read_file_contents(here.path);
+                print(f"📄 Extracted contents for imported file '{here.name}'");
+            } else {
+                print(f"⚠️ File not found for imported module '{here.name}' at {here.path}");
+                self.found_content = "";
+            }
+
+            disengage;
+        }
+    }
+
+}
+
 
 with entry {
     load_dotenv();

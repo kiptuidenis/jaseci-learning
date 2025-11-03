@@ -106,7 +106,6 @@ walker BuildFullCCG {
         if here.name.endswith(".py") {
             #print(f"This is file {here.name} with path {here.path}");
             try {
-                self.file_count += 1;
 
                 let repo_root = self.repo_root if self.root_dir_updated == None else self.root_dir_updated.path;
                 let parent_root = os.path.dirname(repo_root);
@@ -181,7 +180,6 @@ walker BuildFullCCG {
                        print(f"❌ Error resolving a specific import in {here.path}: {inner_e}");
                     }
                 }
-                #print(f"Number of files visited: {self.file_count}");
             }
             except Exception as e {
                 print(f"ASTROID error in {here.path}: {e}");
@@ -495,6 +493,108 @@ walker TraversePartialCCG {
 }
 
 
+walker CallFinder {
+    has caller_name: str = "";
+    has caller_path: str = "";
+    has callee_name: str = "";
+    has found_content: str = "";
+    has found_node: Function | Class | None = None;
+
+    can find_callee with Directory entry {
+        # Visit all subnodes in the graph recursively
+        visit [-->];
+    }
+    can traverse_file with File entry {
+       visit [-->];
+    }
+    can traverse_class with Class entry { 
+        visit [-->];
+    }
+
+    can check_function with Function entry {
+
+        # Step 1: Find the caller function by name and file path
+        if here.name == self.caller_name and here.path == self.caller_path {
+            print(f"✅ Found caller '{here.name}' at {here.path}");
+
+            # Step 2: Traverse only the Calls edges from this caller to its callees
+            visit [->:Calls:->(`?Function)](?name==self.callee_name);
+        } else {
+            visit [-->];
+        }
+    }
+      can check_callee with Function entry {
+
+        # Step 3: Once we’re visiting via Calls edge, match the callee name
+        if here.name == self.callee_name {
+            print(f"✅ Found callee '{here.name}' at {here.path}");
+
+            if os.path.exists(here.path) {
+                self.found_node = here;
+                self.found_content = utils.read_file_contents(here.path);
+                print(f"📄 Extracted contents for '{here.name}'");
+            } else {
+                print(f"⚠️ File not found for callee '{here.name}' at {here.path}");
+                self.found_content = "";
+            }
+
+            disengage;
+        }
+    }
+
+
+}
+
+walker InheritsFromFinder {
+    has child_name: str = "";
+    has child_path: str = "";
+    has parent_name: str = "";
+    has found_content: str = "";
+    has found_node: Class | None = None;
+
+    can find_parent with Directory entry {
+        # Visit all subnodes in the graph recursively
+        visit [-->];
+    }
+
+    can traverse_file with File entry {
+        visit [-->];
+    }
+
+    can traverse_class with Class entry {
+
+
+        # Step 1: Find the child class by name and file path
+        if here.name == self.child_name and here.path == self.child_path {
+            print(f"✅ Found child class '{here.name}' at {here.path}");
+
+            # Step 2: Traverse only the InheritsFrom edges to find the parent
+            visit [->:InheritsFrom:->(`?Class)](?name==self.parent_name);
+        } else {
+            visit [-->];
+        }
+    }
+
+    can check_parent with Class entry {
+
+        # Step 3: Once we’re visiting via InheritsFrom edge, match the parent class
+        if here.name == self.parent_name {
+            print(f"✅ Found parent class '{here.name}' at {here.path}");
+
+            if os.path.exists(here.path) {
+                self.found_node = here;
+                self.found_content = utils.read_file_contents(here.path);
+                print(f"📄 Extracted contents for parent class '{here.name}'");
+            } else {
+                print(f"⚠️ File not found for parent '{here.name}' at {here.path}");
+                self.found_content = "";
+            }
+
+            disengage;
+        }
+    }
+}
+
 
 
 with entry {
@@ -556,6 +656,11 @@ for jac_path in jac_files {
     else {
         print("Tooo baaaaddd...Unsuccessful tree building");
     }
+    callee = root_dir_updated spawn CallFinder(caller_name="do_create", caller_path="/home/denis/jaseci-learning/fun/classmates/AirBnB_clone_v2/console.py", callee_name="save");
+    #print(f"This is callee content: {callee.found_content}");
+
+    inheretee = root_dir_updated spawn InheritsFromFinder(child_name="City", child_path="/home/denis/jaseci-learning/fun/classmates/AirBnB_clone_v2/models/city.py", parent_name="BaseModel");
+    print(f"This is parent content: {inheretee.found_content}");
 
 }
 
