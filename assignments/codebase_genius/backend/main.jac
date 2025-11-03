@@ -8,6 +8,9 @@ import astroid;
 import sys;
 import importlib;
 import from astroid { nodes }
+import from byllm.llm { Model }
+
+glob llm = Model(model_name="gemini/gemini-2.0-flash", verbose=False);
 
 
 node Directory {
@@ -47,7 +50,18 @@ node Supervisor {
     has root_directory: Directory | None | dict = None;
     has readme_summary: str = "";
     has partial_ccg_root: Directory | None | dict = None;
+    has documentation: str = "";
 
+    def extract_file(file_path: str) -> str;
+    def call_finder(caller_name: str, caller_path: str, callee_name: str) -> str;
+    def class_hierarchies()-> str;
+    def import_finder()-> str;
+    def diagram_generator()-> str;
+
+    def doc_genie(ccg_root: Directory, readme_summary: str) ->  str by llm(
+        method="ReAct",
+        tools=([self.extract_file, self.call_finder, self.class_hierarchies, self.import_finder, self.diagram_generator]),
+    );
 
     can clone_repo with StartCloning entry {
         print("Starting delegation to RepoMapper (still at Supervisor)...");
@@ -151,6 +165,10 @@ node Supervisor {
             print(f"This is type of partcial_ccg_root when building full ccg: {type(self.partial_ccg_root)}");
             full_ccg = self.partial_ccg_root spawn BuildFullCCG(repo_root=self.partial_ccg_root.path, root_dir_updated=self.partial_ccg_root);
             if full_ccg.is_built {
+
+                self.documentation = self.doc_genie(ccg_root=self.partial_ccg_root, readme_summary=self.readme_summary);
+                print(self.documentation);
+
                 report "Success: Full CCG built successfully.";
             } else {
                 report "Error: Full CCG build failed.";
@@ -813,6 +831,58 @@ walker FunctionFinder {
             }
         }
     }
+}
+
+walker CallFinder {
+    has caller_name: str = "";
+    has caller_path: str = "";
+    has callee_name: str = "";
+    has found_content: str = "";
+    has found_node: Function | Class | None = None;
+
+    can find_callee with Directory entry {
+        # Visit all subnodes in the graph recursively
+        visit [-->];
+    }
+    can traverse_file with File entry {
+       visit [-->];
+    }
+    can traverse_class with Class entry { 
+        visit [-->];
+    }
+
+    can check_function with Function entry {
+
+        # Step 1: Find the caller function by name and file path
+        if here.name == self.caller_name and here.path == self.caller_path {
+            print(f"✅ Found caller '{here.name}' at {here.path}");
+
+            # Step 2: Traverse only the Calls edges from this caller to its callees
+            visit [->:Calls:->(`?Function)](?name==self.callee_name);
+        } else {
+            visit [-->];
+        }
+    }
+      can check_callee with Function entry {
+
+        # Step 3: Once we’re visiting via Calls edge, match the callee name
+        if here.name == self.callee_name {
+            print(f"✅ Found callee '{here.name}' at {here.path}");
+
+            if os.path.exists(here.path) {
+                self.found_node = here;
+                self.found_content = utils.read_file_contents(here.path);
+                print(f"📄 Extracted contents for '{here.name}'");
+            } else {
+                print(f"⚠️ File not found for callee '{here.name}' at {here.path}");
+                self.found_content = "";
+            }
+
+            disengage;
+        }
+    }
+
+
 }
 
 with entry {
