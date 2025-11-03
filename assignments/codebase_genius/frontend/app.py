@@ -9,7 +9,7 @@ BACKEND_URL = "http://localhost:8000/walker"  # Base URL
 VALIDATE_ENDPOINT = f"{BACKEND_URL}/receiveurl"
 CLONE_ENDPOINT = f"{BACKEND_URL}/StartCloning"
 FILE_TREE_ENDPOINT = f"{BACKEND_URL}/file_tree_generator"
-BUILD_CCG_ENDPOINT = f"{BACKEND_URL}/BuildCCG"  # ✅ New endpoint for CCG build
+GENERATE_DOCS_ENDPOINT = f"{BACKEND_URL}/BuildCCG"  # ✅ Combined CCG + Docs generation
 
 st.set_page_config(page_title="Codebase Genius", page_icon="🧠", layout="centered")
 
@@ -33,6 +33,10 @@ def send_to_backend(endpoint: str, payload: dict, timeout=240):
     try:
         response = requests.post(endpoint, json=payload, timeout=timeout)
         if response.status_code == 200:
+            # If backend returns markdown directly (string)
+            if response.headers.get("content-type", "").startswith("text/markdown"):
+                return {"status": "valid", "markdown": response.text}
+
             result = response.json()
             reports = result.get("report") or result.get("reports")
 
@@ -40,24 +44,16 @@ def send_to_backend(endpoint: str, payload: dict, timeout=240):
                 first = reports[0]
                 if isinstance(first, dict):
                     message = first.get("message", str(first))
+                    valid = first.get("valid", True)
+                    return {"status": "valid" if valid else "invalid", "message": message}
                 elif isinstance(first, str):
                     message = first.strip()
-                else:
-                    message = str(first)
-
-                if isinstance(first, dict):
-                    valid = first.get("valid", True)
-                    if valid:
-                        return {"status": "valid", "message": message}
-                    else:
-                        return {"status": "invalid", "message": message}
-                else:
                     if message.lower().startswith("success"):
                         return {"status": "valid", "message": message.replace("Success:", "").strip()}
                     elif message.lower().startswith("error"):
                         return {"status": "invalid", "message": message.replace("Error:", "").strip()}
-                    else:
-                        return {"status": "error", "message": f"Unexpected message: {message}"}
+                else:
+                    return {"status": "error", "message": f"Unexpected response: {first}"}
             else:
                 return {"status": "error", "message": "No reports returned from backend."}
         else:
@@ -73,6 +69,7 @@ if generate_button:
     if not github_url.strip():
         st.error("❌ Please enter a GitHub URL before proceeding.")
     else:
+        # STEP 1: Validate GitHub URL
         with st.spinner("🔍 Validating GitHub URL..."):
             validation = send_to_backend(VALIDATE_ENDPOINT, {"url": github_url.strip()}, timeout=300)
 
@@ -85,52 +82,40 @@ if generate_button:
         elif validation["status"] == "valid":
             st.success(f"✅ {validation['message']}")
 
-            # ---------------------------
             # STEP 2: Clone Repository
-            # ---------------------------
             with st.spinner("🌀 Cloning repository... this may take a few moments."):
                 cloning = send_to_backend(CLONE_ENDPOINT, {"url": github_url.strip()}, timeout=300)
 
             if cloning["status"] == "valid":
                 st.success(f"📦 {cloning['message']}")
 
-                # ---------------------------
                 # STEP 3: Generate File Tree
-                # ---------------------------
                 with st.spinner("🌲 Building project file tree..."):
-                    # time.sleep(5)
                     file_tree = send_to_backend(FILE_TREE_ENDPOINT, {"url": github_url.strip()}, timeout=300)
 
                 if file_tree["status"] == "valid":
                     st.success(f"🌳 {file_tree['message']}")
 
-                    # ---------------------------
-                    # ✅ NEW STEP 4: Build CCG
-                    # ---------------------------
-                    with st.spinner("🧩 Building partial Code Context Graph (CCG)..."):
-                        time.sleep(5)
-                        build_ccg = send_to_backend(BUILD_CCG_ENDPOINT, {"url": github_url.strip()}, timeout=300)
+                    # ✅ NEW MERGED STEP 4: Generate Docs (CCG + Markdown)
+                    with st.spinner("📚 Generating documentation... this may take several minutes..."):
+                        generate_docs = send_to_backend(GENERATE_DOCS_ENDPOINT, {"url": github_url.strip()}, timeout=600)
 
-                    if build_ccg["status"] == "valid":
-                        st.success(f"🧠 {build_ccg['message']}")
-
-                        # ---------------------------
-                        # STEP 5: Generate Documentation
-                        # ---------------------------
-                        with st.spinner("📚 Generating documentation... please wait..."):
-                            time.sleep(5)
+                    if generate_docs["status"] == "valid":
+                        if "markdown" in generate_docs:
+                            markdown_data = generate_docs["markdown"]
                             st.success("✅ Documentation generated successfully!")
                             st.download_button(
                                 label="📄 Download Documentation (Markdown)",
-                                data="# Example Documentation\n\nThis is a placeholder doc.",
-                                file_name="docs.md",
+                                data=markdown_data,
+                                file_name="documentation.md",
                                 mime="text/markdown"
                             )
+                        else:
+                            st.success(f"🧠 {generate_docs.get('message', 'Documentation generated successfully!')}")
+                            st.info("⚠️ Backend did not return markdown content.")
                     else:
-                        st.error(f"❌ CCG build failed: {build_ccg['message']}")
-
+                        st.error(f"❌ Documentation generation failed: {generate_docs['message']}")
                 else:
                     st.error(f"❌ File tree generation failed: {file_tree['message']}")
-
             else:
                 st.error(f"❌ Cloning failed: {cloning['message']}")

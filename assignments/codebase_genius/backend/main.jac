@@ -165,14 +165,43 @@ node Supervisor {
             print(f"This is type of partcial_ccg_root when building full ccg: {type(self.partial_ccg_root)}");
             full_ccg = self.partial_ccg_root spawn BuildFullCCG(repo_root=self.partial_ccg_root.path, root_dir_updated=self.partial_ccg_root);
             if full_ccg.is_built {
+    print("🧠 Generating markdown documentation via DocGenie...");
 
-                self.documentation = self.doc_genie(ccg_root=self.partial_ccg_root, readme_summary=self.readme_summary);
-                print(self.documentation);
+    self.documentation = self.doc_genie(
+        ccg_root=self.partial_ccg_root,
+        readme_summary=self.readme_summary
+    );
 
-                report "Success: Full CCG built successfully.";
-            } else {
-                report "Error: Full CCG build failed.";
-            }
+    if self.documentation and len(self.documentation.strip()) > 0 {
+        # ✅ Save docs in current working directory (not temp)
+
+        repo_name = "repository";
+        if hasattr(self, "repo_url") {
+            repo_name = os.path.splitext(os.path.basename(self.repo_url))[0];
+        }
+
+        current_dir = os.getcwd();
+        output_dir = f"{current_dir}/outputs/{repo_name}";
+        os.makedirs(output_dir, exist_ok=True);
+
+        output_path = f"{output_dir}/docs.md";
+
+        with open(output_path, "w") as f {
+            f.write(self.documentation);
+        }
+
+        print(f"✅ Documentation saved successfully at: {output_path}");
+        report f"Success: Documentation generated successfully and saved to {output_path}";
+    } else {
+        print("⚠️ DocGenie returned empty documentation.");
+        report "Warning: CCG built successfully, but no documentation was generated.";
+    }
+} else {
+    report "Error: Full CCG build failed.";
+}
+
+
+
     
         } 
         else {
