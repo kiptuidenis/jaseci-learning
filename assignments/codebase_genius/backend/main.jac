@@ -79,8 +79,8 @@ node Supervisor {
         self.root_dir = visitor.root_dir;
         self.readme_summary = visitor.readme_summary;
         print(f"Updated readme summary: {self.readme_summary}");
-        print(f"Updated root directory: {self.root_dir}");
-        disengage;
+        #print(f"Updated root directory: {self.root_dir}");
+        #disengage;
     }
 
     can build_partial_CCG with BuildCCG entry {
@@ -88,13 +88,14 @@ node Supervisor {
         self.root_directory = Directory(
             path=self.root_dir["path"],
             name=self.root_dir["name"],
-            subdirectories=self.root_dir["subdirectories"],
-            files=self.root_dir["files"]
+            #subdirectories=self.root_dir["subdirectories"],
+            #files=self.root_dir["files"]
         );
 
         #print(self.root_directory);
         self.root_directory spawn BuildTreeWalker();
         files = self.root_directory spawn TreeTraverser();
+        print(f"FINAL FILE TREE STRUCTURE: {self.root_directory}");
 
         py_files = [];
         jac_files = [];
@@ -500,7 +501,7 @@ node RepoMapper {
         }
 
         report "Success: File tree generated.";
-        root_dir spawn TreeTraverser();
+        #root_dir spawn TreeTraverser();
         root spawn CarryReadMeAndRootDir(root_dir=root_dir, readme_summary=self.readme_summary, url=self.url);
         disengage;
     }
@@ -515,8 +516,8 @@ walker delegate {
 
         visit [here -->](`?RepoMapper) else {
             new_mapper = RepoMapper(url=self.url);
-            attached_mapper = here ++> new_mapper;
-            visit attached_mapper;
+            here ++> new_mapper;
+            visit new_mapper;
             print("Created and visited new RepoMapper node.");
         }
     }
@@ -612,12 +613,12 @@ walker BuildTreeWalker {
 
             if os.path.isdir(full_path) {
                 let subdir_node = Directory(path=full_path, name=entry);
-                #here.subdirectories.append(subdir_node);
+                here.subdirectories.append(subdir_node);
                 here ++> subdir_node;
                 visit subdir_node;
             } else {
                 let file_node = File(path=full_path, name=entry);
-                #here.files.append(file_node);
+                here.files.append(file_node);
                 here ++> file_node;
                 visit file_node;
             }
