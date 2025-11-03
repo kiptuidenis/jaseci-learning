@@ -7,8 +7,9 @@ import time
 # ---------------------------
 BACKEND_URL = "http://localhost:8000/walker"  # Base URL
 VALIDATE_ENDPOINT = f"{BACKEND_URL}/receiveurl"
-CLONE_ENDPOINT = f"{BACKEND_URL}/start_cloning"
-FILE_TREE_ENDPOINT = f"{BACKEND_URL}/file_tree_generator"  # ✅ New endpoint
+CLONE_ENDPOINT = f"{BACKEND_URL}/StartCloning"
+FILE_TREE_ENDPOINT = f"{BACKEND_URL}/file_tree_generator"
+BUILD_CCG_ENDPOINT = f"{BACKEND_URL}/BuildCCG"  # ✅ New endpoint for CCG build
 
 st.set_page_config(page_title="Codebase Genius", page_icon="🧠", layout="centered")
 
@@ -73,7 +74,7 @@ if generate_button:
         st.error("❌ Please enter a GitHub URL before proceeding.")
     else:
         with st.spinner("🔍 Validating GitHub URL..."):
-            validation = send_to_backend(VALIDATE_ENDPOINT, {"url": github_url.strip()})
+            validation = send_to_backend(VALIDATE_ENDPOINT, {"url": github_url.strip()}, timeout=300)
 
         if validation["status"] == "invalid":
             st.error(validation["message"])
@@ -92,30 +93,42 @@ if generate_button:
 
             if cloning["status"] == "valid":
                 st.success(f"📦 {cloning['message']}")
-                
 
                 # ---------------------------
-                # ✅ NEW STEP 3: Generate File Tree
+                # STEP 3: Generate File Tree
                 # ---------------------------
                 with st.spinner("🌲 Building project file tree..."):
-                    time.sleep(5)
+                    # time.sleep(5)
                     file_tree = send_to_backend(FILE_TREE_ENDPOINT, {"url": github_url.strip()}, timeout=300)
 
                 if file_tree["status"] == "valid":
                     st.success(f"🌳 {file_tree['message']}")
 
                     # ---------------------------
-                    # STEP 4: Generate Documentation
+                    # ✅ NEW STEP 4: Build CCG
                     # ---------------------------
-                    with st.spinner("🧠 Generating docs... please wait..."):
+                    with st.spinner("🧩 Building partial Code Context Graph (CCG)..."):
                         time.sleep(5)
-                        st.success("✅ Documentation generated successfully!")
-                        st.download_button(
-                            label="📄 Download Documentation (Markdown)",
-                            data="# Example Documentation\n\nThis is a placeholder doc.",
-                            file_name="docs.md",
-                            mime="text/markdown"
-                        )
+                        build_ccg = send_to_backend(BUILD_CCG_ENDPOINT, {"url": github_url.strip()}, timeout=300)
+
+                    if build_ccg["status"] == "valid":
+                        st.success(f"🧠 {build_ccg['message']}")
+
+                        # ---------------------------
+                        # STEP 5: Generate Documentation
+                        # ---------------------------
+                        with st.spinner("📚 Generating documentation... please wait..."):
+                            time.sleep(5)
+                            st.success("✅ Documentation generated successfully!")
+                            st.download_button(
+                                label="📄 Download Documentation (Markdown)",
+                                data="# Example Documentation\n\nThis is a placeholder doc.",
+                                file_name="docs.md",
+                                mime="text/markdown"
+                            )
+                    else:
+                        st.error(f"❌ CCG build failed: {build_ccg['message']}")
+
                 else:
                     st.error(f"❌ File tree generation failed: {file_tree['message']}")
 
