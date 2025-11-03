@@ -95,7 +95,7 @@ walker TreeTraverser {
 walker BuildFullCCG {
     has repo_root: str = "";
     has root_dir_updated: Directory | None = None;
-    has file_count: int = 0;
+    has is_built: bool = False;
 
     can build_full_ccg with Directory entry {
         print("🔎 Traversing repository for full CCG enrichment...");
@@ -104,7 +104,7 @@ walker BuildFullCCG {
 
     can analyze_file with File entry {
         if here.name.endswith(".py") {
-            print(f"This is file {here.name} with path {here.path}");
+            #print(f"This is file {here.name} with path {here.path}");
             try {
                 self.file_count += 1;
 
@@ -112,23 +112,23 @@ walker BuildFullCCG {
                 let parent_root = os.path.dirname(repo_root);
                 if parent_root not in sys.path {
                     sys.path.insert(0, parent_root);
-                   print(f"🧭 Added parent directory to sys.path: {parent_root}");
+                   #print(f"🧭 Added parent directory to sys.path: {parent_root}");
                 }
                 if repo_root not in sys.path {
                     sys.path.insert(0, repo_root);
-                   print(f"🧭 Added repo root to sys.path: {repo_root}");
+                   #print(f"🧭 Added repo root to sys.path: {repo_root}");
                 }
 
                 let source_code = open(here.path).read();
                 let tree = astroid.parse(source_code);
-                print(f"📄 Analyzing imports in {here.name}...");
+                #print(f"📄 Analyzing imports in {here.name}...");
 
                 for node in tree.body {
                     try {
                         if isinstance(node, nodes.Import) {
                             for (name, alias) in node.names {
                                 let mod_name = name;
-                                print(f"🔎 Found Import: {mod_name}");
+                                #print(f"🔎 Found Import: {mod_name}");
                                 let path_found = utils.resolve_module_to_path(mod_name, here.path, level=0, is_from=False);
 
                                 if path_found != None and path_found.startswith(repo_root) {
@@ -146,7 +146,7 @@ walker BuildFullCCG {
                         } elif isinstance(node, nodes.ImportFrom) {
                             let modname = getattr(node, "modname", None);
                             let level = getattr(node, "level", 0) or 0;
-                            print(f"🔎 Found ImportFrom: module='{modname}' level={level} names={[n[0] for n in node.names]}");
+                            #print(f"🔎 Found ImportFrom: module='{modname}' level={level} names={[n[0] for n in node.names]}");
 
                             let candidate_path = utils.resolve_module_to_path(modname, here.path, level=level, is_from=True);
 
@@ -181,7 +181,7 @@ walker BuildFullCCG {
                        print(f"❌ Error resolving a specific import in {here.path}: {inner_e}");
                     }
                 }
-                print(f"Number of files visited: {self.file_count}");
+                #print(f"Number of files visited: {self.file_count}");
             }
             except Exception as e {
                 print(f"ASTROID error in {here.path}: {e}");
@@ -198,14 +198,14 @@ walker BuildFullCCG {
             let source_code = open(here.path).read();
             let tree = astroid.parse(source_code);
             let class_nodes = [n for n in tree.body if isinstance(n, astroid.nodes.ClassDef) and n.name == here.name];
-            print(f"These are class nodes found: {class_nodes}");
+            #print(f"These are class nodes found: {class_nodes}");
 
             for cnode in class_nodes {
                 for base in cnode.bases {
-                    print(f"These are bases in class_nodes: {base}");
+                    #print(f"These are bases in class_nodes: {base}");
                     try {
                         let inferred = list(base.infer());
-                        print(f"This is infered : {inferred}");
+                       # print(f"This is infered : {inferred}");
                         for b in inferred {
                             try {
                                 let base_path = "";
@@ -217,10 +217,10 @@ walker BuildFullCCG {
                                     base_path = here.path;
                                 }
 
-                                print(f"📁 This is the base path of file where class: {base_path}");
+                               # print(f"📁 This is the base path of file where class: {base_path}");
 
                                 let base_name = getattr(b, "name", "");
-                                print(f"🔍 Searching for base class '{base_name}' in {base_path}");
+                                #print(f"🔍 Searching for base class '{base_name}' in {base_path}");
 
                                 if base_path.startswith(self.repo_root) {
                                     let finder = self.root_dir_updated spawn ClassFinder(
@@ -257,7 +257,6 @@ walker BuildFullCCG {
             can analyze_function with Function entry {
         try {
             print(f"🔧 Analyzing function {here.name} at {here.path}");
-            import astroid;
 
             let source_code = open(here.path).read();
             let tree = astroid.parse(source_code);
@@ -333,19 +332,23 @@ walker BuildFullCCG {
                         }
 
                         if not resolved {
-                            print(f"🌐 External or unresolved call ignored: {getattr(call.func, 'name', 'unknown')}");
+                            #print(f"🌐 External or unresolved call ignored: {getattr(call.func, 'name', 'unknown')}");
                         }
 
                     }
                     except Exception as ce {
-                        print(f"❌ Error analyzing call in {here.name}: {ce}");
+                        #print(f"❌ Error analyzing call in {here.name}: {ce}");
                     }
                 }
             }
+            
         }
         except Exception as e {
-            print(f"❌ Error analyzing function {here.name}: {e}");
+            #print(f"❌ Error analyzing function {here.name}: {e}");
         }
+            #print("✅ Finished building full CCG.");
+            self.is_built = True;
+            #print(f"🏁 is_built set to {self.is_built}");
     }
 }
 
@@ -546,7 +549,13 @@ for jac_path in jac_files {
     root ++> root_dir_updated;
     root_dir_updated spawn BuildCCG();
     #root_dir_updated spawn TraversePartialCCG();
-    root_dir_updated spawn BuildFullCCG(repo_root=root_dir_updated.path, root_dir_updated=root_dir_updated);
+    full_ccg = root_dir_updated spawn BuildFullCCG(repo_root=root_dir_updated.path, root_dir_updated=root_dir_updated);
+    if full_ccg.is_built {
+        print("Yeeeeeyyyyyyy..Finished Succesfully");
+    }
+    else {
+        print("Tooo baaaaddd...Unsuccessful tree building");
+    }
 
 }
 
