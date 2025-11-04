@@ -9,6 +9,7 @@ import sys;
 import importlib;
 import from astroid { nodes }
 import from byllm.llm { Model }
+import os, json;
 
 glob llm = Model(model_name="gemini/gemini-2.0-flash", verbose=False);
 
@@ -164,7 +165,9 @@ node Supervisor {
             
             print(f"This is type of partcial_ccg_root when building full ccg: {type(self.partial_ccg_root)}");
             full_ccg = self.partial_ccg_root spawn BuildFullCCG(repo_root=self.partial_ccg_root.path, root_dir_updated=self.partial_ccg_root);
-            if full_ccg.is_built {
+           if full_ccg.is_built {
+
+
     print("🧠 Generating markdown documentation via DocGenie...");
 
     self.documentation = self.doc_genie(
@@ -191,13 +194,25 @@ node Supervisor {
         }
 
         print(f"✅ Documentation saved successfully at: {output_path}");
-        report f"Success: Documentation generated successfully and saved to {output_path}";
+
+        # ✅ Return JSON so frontend can find the markdown path
+        report json.dumps({
+            "status": "valid",
+            "message": "Documentation generated successfully.",
+            "markdown_path": output_path
+        });
     } else {
         print("⚠️ DocGenie returned empty documentation.");
-        report "Warning: CCG built successfully, but no documentation was generated.";
+        report json.dumps({
+            "status": "invalid",
+            "message": "CCG built successfully, but no documentation was generated."
+        });
     }
 } else {
-    report "Error: Full CCG build failed.";
+    report json.dumps({
+        "status": "invalid",
+        "message": "Full CCG build failed."
+    });
 }
 
 
