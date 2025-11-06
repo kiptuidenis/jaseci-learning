@@ -11,10 +11,9 @@ import uuid;
 import from astroid { nodes }
 import from byllm.llm { Model }
 
-glob llm = Model(model_name="gemini/gemini-2.0-flash", verbose=False);
+glob llm = Model(model_name="gemini/gemini-2.5-flash", verbose=False);
 
-import os;
-import astroid;
+
 
 def resolve_module_to_path(module_name: str, here_path: str, level: int=0, is_from: bool=False) -> str | None {
     try {
@@ -141,7 +140,10 @@ def read_file_contents(file_path: str) -> str {
 }
 
 
-
+"""
+Take in contents of ReadMe and summarize it into useful summary that can be used to generate 
+in depth documentation of the repository.
+"""
 def summarize_readme(path: str) -> str by llm();
 
 sem find_entry_files = """
