@@ -4,7 +4,7 @@
 Codebase Genius is an AI-powered code analysis tool that helps developers understand and navigate complex codebases. It uses advanced language models and static analysis to provide insights into your code repository.
 
 ## Features
-- Repository analysis and code understanding
+- Python and Jac Repository analysis and code understanding
 - AI-powered code documentation generation
 - Code structure visualization
 - Intelligent code search and navigation
@@ -72,7 +72,7 @@ touch .env
 ```
 Add your environment variables:
 ```env
-OPENAI_API_KEY=your_api_key_here
+GEMINI_API_KEY=your_api_key_here
 REPO_ROOT=/path/to/your/repository
 ```
 
@@ -88,9 +88,9 @@ pip install streamlit requests
 From the project root directory:
 ```bash
 cd backend
-jaseci serve
+jac serve main.jac
 ```
-The Jaseci server will start on `http://localhost:8000`
+The  server will start on `http://localhost:8000`
 
 ### 2. Start the Frontend Application
 In a new terminal, from the project root directory:
@@ -103,7 +103,7 @@ The Streamlit interface will open in your default web browser at `http://localho
 ## Output and Documentation
 - Generated documentation and analysis results are stored in the `outputs/repository` directory
 - Documentation is generated in markdown format (`docs.md`)
-- Code analysis artifacts and intermediate files are also stored in the outputs directory
+
 
 ## External Libraries Used
 - **Jaseci**: Main backend framework
@@ -111,7 +111,6 @@ The Streamlit interface will open in your default web browser at `http://localho
 - **Astroid**: Python static code analysis
 - **Jedi**: Python code analysis and autocompletion
 - **GitPython**: Git repository management
-- **ByLLM**: Language model integration
 - **Dotenv**: Environment variable management
 
 ## Contributing
