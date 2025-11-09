@@ -28,18 +28,17 @@ codebase_genius/
 
 ### Backend Dependencies
 ```bash
-pip install jaseci
-pip install astroid
-pip install jedi
-pip install gitpython
-pip install byllm
-pip install python-dotenv
+jaseci
+astroid
+jedi
+gitpython
+python-dotenv
 ```
 
 ### Frontend Dependencies
 ```bash
-pip install streamlit
-pip install requests
+streamlit
+requests
 ```
 
 ## Installation and Setup
@@ -55,7 +54,7 @@ cd jaseci-learning/assignments/codebase_genius
 #### Backend Setup
 1. Create and activate a Python virtual environment:
 ```bash
-python -m venv jac-env
+python3 -m venv jac-env
 source jac-env/bin/activate  # On Linux/Mac
 # or
 .\jac-env\Scripts\activate   # On Windows
@@ -63,17 +62,14 @@ source jac-env/bin/activate  # On Linux/Mac
 
 2. Install backend dependencies:
 ```bash
-pip install jaseci astroid jedi gitpython byllm python-dotenv
+pip install jaseci astroid jedi 
 ```
 
-3. Create a `.env` file in the project root:
-```bash
-touch .env
-```
+3. Create a `.env` file in the `codebase_genius` folder:
+
 Add your environment variables:
 ```env
 GEMINI_API_KEY=your_api_key_here
-REPO_ROOT=/path/to/your/repository
 ```
 
 #### Frontend Setup
@@ -87,20 +83,26 @@ pip install streamlit requests
 ### 1. Start the Backend Server
 From the project root directory:
 ```bash
-cd backend
-jac serve main.jac
+jac serve backend/main.jac
 ```
 The  server will start on `http://localhost:8000`
 
 ### 2. Start the Frontend Application
-In a new terminal, from the project root directory:
+In a new terminal, cd into codebase_genius folder.
+Activate virtual environment:
 ```bash
-cd frontend
-streamlit run app.py
+source ./jac-env/bin/activate
+```
+Run frontend:
+```bash
+streamlit run frontend/app.py
 ```
 The Streamlit interface will open in your default web browser at `http://localhost:8501`
 
+You can use this repo as an example to generate docs `https://github.com/kiptuidenis/AirBnB_clone_v2.git`
+
 ## Output and Documentation
+- Download and use markdown viewer to view documentation
 - Generated documentation and analysis results are stored in the `outputs/repository` directory
 - Documentation is generated in markdown format (`docs.md`)
 
