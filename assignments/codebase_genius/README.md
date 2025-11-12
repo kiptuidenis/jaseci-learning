@@ -1,5 +1,5 @@
 # Codebase Genius
-
+[![Watch the demo](https://img.youtube.com/vi/Nbe9paxmsGI/0.jpg)](https://youtu.be/Nbe9paxmsGI)
 ## Overview
 Codebase Genius is an AI-powered code analysis tool that helps developers understand and navigate complex codebases. It uses advanced language models and static analysis to provide insights into your code repository.
 
